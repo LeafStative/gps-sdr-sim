@@ -2,8 +2,8 @@
 #define GETOPT_H
 
 extern char *optarg;
-extern int optind;
+extern int   optind;
 
-int getopt(int nargc, char * const nargv[], const char *ostr) ;
+int getopt(int nargc, char *const nargv[], const char *ostr);
 
 #endif
