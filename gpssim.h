@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef GPSSIM_H
 #define GPSSIM_H
 

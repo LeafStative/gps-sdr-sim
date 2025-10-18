@@ -5,11 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 #ifdef _WIN32
 #include "getopt.h"
 #else
 #include <unistd.h>
 #endif
+
 #include "gpssim.h"
 
 // clang-format off
@@ -2045,7 +2047,7 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     // Allocate I/Q buffer
-    iq_buff = calloc(2 * iq_buff_size, 2);
+    iq_buff = reinterpret_cast<short *>(calloc(2 * iq_buff_size, 2));
 
     if (iq_buff == NULL) {
         fprintf(stderr, "ERROR: Failed to allocate 16-bit I/Q buffer.\n");
@@ -2053,13 +2055,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (data_format == SC08) {
-        iq8_buff = calloc(2 * iq_buff_size, 1);
+        iq8_buff = reinterpret_cast<signed char *>(calloc(2 * iq_buff_size, 1));
         if (iq8_buff == NULL) {
             fprintf(stderr, "ERROR: Failed to allocate 8-bit I/Q buffer.\n");
             exit(1);
         }
     } else if (data_format == SC01) {
-        iq8_buff = calloc(iq_buff_size / 4, 1); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
+        iq8_buff = reinterpret_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
         if (iq8_buff == NULL) {
             fprintf(stderr, "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n");
             exit(1);

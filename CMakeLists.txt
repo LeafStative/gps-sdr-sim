@@ -17,7 +17,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows)
 endif()
 
 add_executable(gps-sdr-sim
-  gpssim.c
+  gpssim.cpp
   $<$<BOOL:${PLATFORM_WINDOWS}>:getopt.c>
 )
 target_link_libraries(gps-sdr-sim PRIVATE
