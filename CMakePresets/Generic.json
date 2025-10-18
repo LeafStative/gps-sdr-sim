@@ -1,0 +1,16 @@
+{
+    "version": 9,
+    "configurePresets": [
+        {
+            "name": "generic",
+            "hidden": true,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_MANIFEST_MODE": "ON"
+            },
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}"
+        }
+    ]
+}

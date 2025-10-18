@@ -1,0 +1,14 @@
+{
+    "version": 9,
+    "include": ["Generic.json"],
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "inherits": "generic",
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-linux-static"
+            }
+        }
+    ]
+}

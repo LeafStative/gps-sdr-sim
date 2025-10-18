@@ -1,0 +1,29 @@
+{
+    "version": 9,
+    "include": ["Generic.json"],
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "inherits": "generic",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang.exe",
+                "CMAKE_CXX_COMPILER": "clang++.exe",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static"
+            }
+        },
+        {
+            "name": "default-msvc",
+            "hidden": true,
+            "inherits": "default",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            }
+        }
+    ]
+}

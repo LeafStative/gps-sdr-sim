@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "CMake",
+            "cppStandard": "c++20",
+            "cStandard": "c23",
+            "compileCommands": "${workspaceFolder}/out/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "browse": {
+                "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db",
+                "limitSymbolsToIncludedHeaders": false
+            }
+        }
+    ],
+    "version": 4
+}
