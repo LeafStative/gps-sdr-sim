@@ -797,7 +797,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
     int flags = 0x0;
 
-    if (NULL == (fp = fopen(fname, "rt"))) return -1;
+    if (nullptr == (fp = fopen(fname, "rt"))) return -1;
 
     // Clear valid flag
     for (ieph = 0; ieph < EPHEM_ARRAY_SIZE; ieph++)
@@ -806,7 +806,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
     // Read header lines
     while (1) {
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         if (strncmp(str + 60, "END OF HEADER", 13) == 0)
             break;
@@ -894,7 +894,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     ieph    = 0;
 
     while (1) {
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         // PRN
         strncpy(tmp, str, 2);
@@ -962,7 +962,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].af2 = atof(tmp);
 
         // BROADCAST ORBIT - 1
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
@@ -985,7 +985,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].m0 = atof(tmp);
 
         // BROADCAST ORBIT - 2
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
@@ -1008,7 +1008,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].sqrta = atof(tmp);
 
         // BROADCAST ORBIT - 3
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
@@ -1031,7 +1031,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].cis = atof(tmp);
 
         // BROADCAST ORBIT - 4
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
@@ -1054,7 +1054,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].omgdot = atof(tmp);
 
         // BROADCAST ORBIT - 5
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
@@ -1072,7 +1072,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].toe.week = static_cast<int>(atof(tmp));
 
         // BROADCAST ORBIT - 6
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         strncpy(tmp, str + 22, 19);
         tmp[19] = 0;
@@ -1091,7 +1091,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         eph[ieph][sv].iodc = static_cast<int>(atof(tmp));
 
         // BROADCAST ORBIT - 7
-        if (NULL == fgets(str, MAX_CHAR, fp)) break;
+        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         // Set valid flag
         eph[ieph][sv].vflg = 1;
@@ -1293,10 +1293,14 @@ int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     char   str[MAX_CHAR];
     double t, x, y, z;
 
-    if (NULL == (fp = fopen(filename, "rt"))) return (-1);
+    if (nullptr == (fp = fopen(filename, "rt"))) {
+        return -1;
+    }
 
     for (numd = 0; numd < USER_MOTION_SIZE; numd++) {
-        if (fgets(str, MAX_CHAR, fp) == NULL) break;
+        if (fgets(str, MAX_CHAR, fp) == nullptr) {
+            break;
+        }
 
         if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &x, &y, &z)) // Read CSV line
             break;
@@ -1324,10 +1328,10 @@ int readUserMotionLLH(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     double t, llh[3];
     char   str[MAX_CHAR];
 
-    if (NULL == (fp = fopen(filename, "rt"))) return -1;
+    if (nullptr == (fp = fopen(filename, "rt"))) return -1;
 
     for (numd = 0; numd < USER_MOTION_SIZE; numd++) {
-        if (fgets(str, MAX_CHAR, fp) == NULL) break;
+        if (fgets(str, MAX_CHAR, fp) == nullptr) break;
 
         if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &llh[0], &llh[1], &llh[2])) // Read CSV line
             break;
@@ -1357,49 +1361,49 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     double llh[3], pos[3];
     char   tmp[8];
 
-    if (NULL == (fp = fopen(filename, "rt"))) return -1;
+    if (nullptr == (fp = fopen(filename, "rt"))) return -1;
 
     while (1) {
-        if (fgets(str, MAX_CHAR, fp) == NULL) break;
+        if (fgets(str, MAX_CHAR, fp) == nullptr) break;
 
         token = strtok(str, ",");
 
         if (strncmp(token + 3, "GGA", 3) == 0) {
-            token = strtok(NULL, ","); // Date and time
+            token = strtok(nullptr, ","); // Date and time
 
-            token = strtok(NULL, ","); // Latitude
+            token = strtok(nullptr, ","); // Latitude
             strncpy(tmp, token, 2);
             tmp[2] = 0;
 
             llh[0] = atof(tmp) + atof(token + 2) / 60.0;
 
-            token = strtok(NULL, ","); // North or south
+            token = strtok(nullptr, ","); // North or south
             if (token[0] == 'S') llh[0] *= -1.0;
 
             llh[0] /= R2D; // in radian
 
-            token = strtok(NULL, ","); // Longitude
+            token = strtok(nullptr, ","); // Longitude
             strncpy(tmp, token, 3);
             tmp[3] = 0;
 
             llh[1] = atof(tmp) + atof(token + 3) / 60.0;
 
-            token = strtok(NULL, ","); // East or west
+            token = strtok(nullptr, ","); // East or west
             if (token[0] == 'W') llh[1] *= -1.0;
 
             llh[1] /= R2D; // in radian
 
-            token = strtok(NULL, ","); // GPS fix
-            token = strtok(NULL, ","); // Number of satellites
-            token = strtok(NULL, ","); // HDOP
+            token = strtok(nullptr, ","); // GPS fix
+            token = strtok(nullptr, ","); // Number of satellites
+            token = strtok(nullptr, ","); // HDOP
 
-            token = strtok(NULL, ","); // Altitude above meas sea level
+            token = strtok(nullptr, ","); // Altitude above meas sea level
 
             llh[2] = atof(token);
 
-            token = strtok(NULL, ","); // in meter
+            token = strtok(nullptr, ","); // in meter
 
-            token = strtok(NULL, ","); // Geoid height above WGS84 ellipsoid
+            token = strtok(nullptr, ","); // Geoid height above WGS84 ellipsoid
 
             llh[2] += atof(token);
 
@@ -1632,8 +1636,8 @@ int main(int argc, char *argv[]) {
 
     int          ip, qp;
     int          iTable;
-    short       *iq_buff  = NULL;
-    signed char *iq8_buff = NULL;
+    short       *iq_buff  = nullptr;
+    signed char *iq8_buff = nullptr;
 
     gpstime_t grx;
     double    delt;
@@ -2048,20 +2052,20 @@ int main(int argc, char *argv[]) {
     // Allocate I/Q buffer
     iq_buff = reinterpret_cast<short *>(calloc(2 * iq_buff_size, 2));
 
-    if (iq_buff == NULL) {
+    if (iq_buff == nullptr) {
         fprintf(stderr, "ERROR: Failed to allocate 16-bit I/Q buffer.\n");
         exit(1);
     }
 
     if (data_format == SC08) {
         iq8_buff = reinterpret_cast<signed char *>(calloc(2 * iq_buff_size, 1));
-        if (iq8_buff == NULL) {
+        if (iq8_buff == nullptr) {
             fprintf(stderr, "ERROR: Failed to allocate 8-bit I/Q buffer.\n");
             exit(1);
         }
     } else if (data_format == SC01) {
         iq8_buff = reinterpret_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
-        if (iq8_buff == NULL) {
+        if (iq8_buff == nullptr) {
             fprintf(stderr, "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n");
             exit(1);
         }
@@ -2070,7 +2074,7 @@ int main(int argc, char *argv[]) {
     // Open output file
     // "-" can be used as name for stdout
     if (strcmp("-", outfile)) {
-        if (NULL == (fp = fopen(outfile, "wb"))) {
+        if (nullptr == (fp = fopen(outfile, "wb"))) {
             fprintf(stderr, "ERROR: Failed to open output file.\n");
             exit(1);
         }
