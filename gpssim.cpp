@@ -764,7 +764,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
             eph[ieph][sv].vflg = 0;
 
     // Read header lines
-    while (1) {
+    while (true) {
         if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         if (strncmp(str + 60, "END OF HEADER", 13) == 0) break;
@@ -851,7 +851,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     g0.week = -1;
     ieph    = 0;
 
-    while (1) {
+    while (true) {
         if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
         // PRN
@@ -1308,7 +1308,7 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
 
     if (nullptr == (fp = fopen(filename, "rt"))) return -1;
 
-    while (1) {
+    while (true) {
         if (fgets(str, MAX_CHAR, fp) == nullptr) break;
 
         const char *token = strtok(str, ",");
