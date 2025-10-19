@@ -135,23 +135,22 @@ void codegen(int *ca, int prn) {
     int delay[] = {5,   6,   7,   8,   17,  18,  139, 140, 141, 251, 252, 254, 255, 256, 257, 258,
                    469, 470, 471, 472, 473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862};
 
-    int g1[CA_SEQ_LEN], g2[CA_SEQ_LEN];
-    int r1[N_DWRD_SBF], r2[N_DWRD_SBF];
-    int c1, c2;
-    int i, j;
 
     if (prn < 1 || prn > 32) return;
 
-    for (i = 0; i < N_DWRD_SBF; i++)
+    int r1[N_DWRD_SBF], r2[N_DWRD_SBF];
+    for (int i = 0; i < N_DWRD_SBF; i++) {
         r1[i] = r2[i] = -1;
+    }
 
-    for (i = 0; i < CA_SEQ_LEN; i++) {
-        g1[i] = r1[9];
-        g2[i] = r2[9];
-        c1    = r1[2] * r1[9];
-        c2    = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[9];
+    int g1[CA_SEQ_LEN], g2[CA_SEQ_LEN];
+    for (int i = 0; i < CA_SEQ_LEN; i++) {
+        g1[i]  = r1[9];
+        g2[i]  = r2[9];
+        int c1 = r1[2] * r1[9];
+        int c2 = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[9];
 
-        for (j = 9; j > 0; j--) {
+        for (int j = 9; j > 0; j--) {
             r1[j] = r1[j - 1];
             r2[j] = r2[j - 1];
         }
@@ -159,8 +158,9 @@ void codegen(int *ca, int prn) {
         r2[0] = c2;
     }
 
-    for (i = 0, j = CA_SEQ_LEN - delay[prn - 1]; i < CA_SEQ_LEN; i++, j++)
+    for (int i = 0, j = CA_SEQ_LEN - delay[prn - 1]; i < CA_SEQ_LEN; i++, j++) {
         ca[i] = (1 - g1[i] * g2[j % CA_SEQ_LEN]) / 2;
+    }
 }
 
 /*! \brief Convert a UTC date into a GPS date
@@ -169,18 +169,17 @@ void codegen(int *ca, int prn) {
  */
 void date2gps(const datetime_t *t, gpstime_t *g) {
     int doy[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
-    int ye;
-    int de;
-    int lpdays;
 
-    ye = t->y - 1980;
+    int ye = t->y - 1980;
 
     // Compute the number of leap days since Jan 5/Jan 6, 1980.
-    lpdays = ye / 4 + 1;
-    if ((ye % 4) == 0 && t->m <= 2) lpdays--;
+    int lpdays = ye / 4 + 1;
+    if (ye % 4 == 0 && t->m <= 2) {
+        lpdays--;
+    }
 
     // Compute the number of days elapsed since Jan 5/Jan 6, 1980.
-    de = ye * 365 + doy[t->m - 1] + t->d + lpdays - 6;
+    int de = ye * 365 + doy[t->m - 1] + t->d + lpdays - 6;
 
     // Convert time to GPS weeks and seconds.
     g->week = de / 7;
@@ -208,15 +207,11 @@ void gps2date(const gpstime_t *g, datetime_t *t) {
  *  \param[out] llh Output Array of Latitude, Longitude and Height
  */
 void xyz2llh(const double *xyz, double *llh) {
-    double a, eps, e, e2;
-    double x, y, z;
-    double rho2, dz, zdz, nh, slat, n, dz_new;
+    constexpr double a = WGS84_RADIUS;
+    constexpr double e = WGS84_ECCENTRICITY;
 
-    a = WGS84_RADIUS;
-    e = WGS84_ECCENTRICITY;
-
-    eps = 1.0e-3;
-    e2  = e * e;
+    constexpr double eps = 1.0e-3;
+    constexpr double e2  = e * e;
 
     if (normVect(xyz) < eps) {
         // Invalid ECEF vector
@@ -227,22 +222,24 @@ void xyz2llh(const double *xyz, double *llh) {
         return;
     }
 
-    x = xyz[0];
-    y = xyz[1];
-    z = xyz[2];
+    double x = xyz[0];
+    double y = xyz[1];
+    double z = xyz[2];
 
-    rho2 = x * x + y * y;
-    dz   = e2 * z;
+    double rho2 = x * x + y * y;
+    double dz   = e2 * z;
 
-    while (1) {
-        zdz    = z + dz;
-        nh     = sqrt(rho2 + zdz * zdz);
-        slat   = zdz / nh;
-        n      = a / sqrt(1.0 - e2 * slat * slat);
-        dz_new = n * e2 * slat;
+    double zdz, nh, n;
+    while (true) {
+        zdz           = z + dz;
+        nh            = sqrt(rho2 + zdz * zdz);
+        double slat   = zdz / nh;
+        n             = a / sqrt(1.0 - e2 * slat * slat);
+        double dz_new = n * e2 * slat;
 
-        if (fabs(dz - dz_new) < eps) break;
-
+        if (std::abs(dz - dz_new) < eps) {
+            break;
+        }
         dz = dz_new;
     }
 
@@ -256,36 +253,23 @@ void xyz2llh(const double *xyz, double *llh) {
  *  \param[out] xyz Output Array of X, Y and Z ECEF coordinates
  */
 void llh2xyz(const double *llh, double *xyz) {
-    double n;
-    double a;
-    double e;
-    double e2;
-    double clat;
-    double slat;
-    double clon;
-    double slon;
-    double d, nph;
-    double tmp;
+    constexpr double a  = WGS84_RADIUS;
+    constexpr double e  = WGS84_ECCENTRICITY;
+    constexpr double e2 = e * e;
 
-    a  = WGS84_RADIUS;
-    e  = WGS84_ECCENTRICITY;
-    e2 = e * e;
+    double clat = cos(llh[0]);
+    double slat = sin(llh[0]);
+    double clon = cos(llh[1]);
+    double slon = sin(llh[1]);
+    double d    = e * slat;
 
-    clat = cos(llh[0]);
-    slat = sin(llh[0]);
-    clon = cos(llh[1]);
-    slon = sin(llh[1]);
-    d    = e * slat;
+    double n   = a / sqrt(1.0 - d * d);
+    double nph = n + llh[2];
 
-    n   = a / sqrt(1.0 - d * d);
-    nph = n + llh[2];
-
-    tmp    = nph * clat;
-    xyz[0] = tmp * clon;
-    xyz[1] = tmp * slon;
-    xyz[2] = ((1.0 - e2) * n + llh[2]) * slat;
-
-    return;
+    double tmp = nph * clat;
+    xyz[0]     = tmp * clon;
+    xyz[1]     = tmp * slon;
+    xyz[2]     = ((1.0 - e2) * n + llh[2]) * slat;
 }
 
 /*! \brief Compute the intermediate matrix for LLH to ECEF
@@ -293,13 +277,11 @@ void llh2xyz(const double *llh, double *xyz) {
  *  \param[out] t Three-by-Three output matrix
  */
 void ltcmat(const double *llh, double t[3][3]) {
-    double slat, clat;
-    double slon, clon;
 
-    slat = sin(llh[0]);
-    clat = cos(llh[0]);
-    slon = sin(llh[1]);
-    clon = cos(llh[1]);
+    double slat = sin(llh[0]);
+    double clat = cos(llh[0]);
+    double slon = sin(llh[1]);
+    double clon = cos(llh[1]);
 
     t[0][0] = -slat * clon;
     t[0][1] = -slat * slon;
@@ -328,13 +310,11 @@ void ecef2neu(const double *xyz, double t[3][3], double *neu) {
  *  \param[out] azel Output array of azimuth + elevation as double
  */
 void neu2azel(double *azel, const double *neu) {
-    double ne;
-
     azel[0] = atan2(neu[1], neu[0]);
     if (azel[0] < 0.0) azel[0] += 2.0 * PI;
 
-    ne      = sqrt(neu[0] * neu[0] + neu[1] * neu[1]);
-    azel[1] = atan2(neu[2], ne);
+    double ne = sqrt(neu[0] * neu[0] + neu[1] * neu[1]);
+    azel[1]   = atan2(neu[2], ne);
 }
 
 /*! \brief Compute Satellite position, velocity and clock at given time
@@ -633,16 +613,15 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
  *  \returns Count of bits set to 1
  */
 unsigned long countBits(unsigned long v) {
-    unsigned long       c;
     const int           S[] = {1, 2, 4, 8, 16};
     const unsigned long B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF};
 
-    c = v;
-    c = (c >> S[0] & B[0]) + (c & B[0]);
-    c = (c >> S[1] & B[1]) + (c & B[1]);
-    c = (c >> S[2] & B[2]) + (c & B[2]);
-    c = (c >> S[3] & B[3]) + (c & B[3]);
-    c = (c >> S[4] & B[4]) + (c & B[4]);
+    unsigned long c = v;
+    c               = (c >> S[0] & B[0]) + (c & B[0]);
+    c               = (c >> S[1] & B[1]) + (c & B[1]);
+    c               = (c >> S[2] & B[2]) + (c & B[2]);
+    c               = (c >> S[3] & B[3]) + (c & B[3]);
+    c               = (c >> S[4] & B[4]) + (c & B[4]);
 
     return c;
 }
@@ -679,7 +658,6 @@ unsigned long computeChecksum(unsigned long source, int nib) {
 
     unsigned long bmask[6] = {0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
 
-    unsigned long D;
     unsigned long d   = source & 0x3FFFFFC0UL;
     unsigned long D29 = source >> 31 & 0x1UL;
     unsigned long D30 = source >> 30 & 0x1UL;
@@ -695,7 +673,7 @@ unsigned long computeChecksum(unsigned long source, int nib) {
         if ((D29 + countBits(bmask[5] & d)) % 2) d ^= 0x1UL << 7;
     }
 
-    D = d;
+    unsigned long D = d;
     if (D30) D ^= 0x3FFFFFC0UL;
 
     D |= ((D29 + countBits(bmask[0] & d)) % 2) << 5;
@@ -717,9 +695,9 @@ unsigned long computeChecksum(unsigned long source, int nib) {
  *  \returns Number of characters replaced
  */
 int replaceExpDesignator(char *str, int len) {
-    int i, n = 0;
+    int n = 0;
 
-    for (i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         if (str[i] == 'D') {
             n++;
             str[i] = 'E';
@@ -730,9 +708,8 @@ int replaceExpDesignator(char *str, int len) {
 }
 
 double subGpsTime(gpstime_t g1, gpstime_t g0) {
-    double dt;
 
-    dt = g1.sec - g0.sec;
+    double dt = g1.sec - g0.sec;
     dt += static_cast<double>(g1.week - g0.week) * SECONDS_IN_WEEK;
 
     return dt;
@@ -775,7 +752,6 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     datetime_t t;
     gpstime_t  g;
     gpstime_t  g0;
-    double     dt;
 
     int flags = 0x0;
 
@@ -913,7 +889,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         if (g0.week == -1) g0 = g;
 
         // Check current time of clock
-        dt = subGpsTime(g, g0);
+        double dt = subGpsTime(g, g0);
 
         if (dt > SECONDS_IN_HOUR) {
             g0 = g;
@@ -1094,30 +1070,27 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
 double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, double *azel) {
     double iono_delay = 0.0;
-    double E, phi_u, lam_u, F;
 
     if (ionoutc->enable == FALSE) return 0.0; // No ionospheric delay
 
-    E     = azel[1] / PI;
-    phi_u = llh[0] / PI;
-    lam_u = llh[1] / PI;
+    double E     = azel[1] / PI;
+    double phi_u = llh[0] / PI;
+    double lam_u = llh[1] / PI;
 
     // Obliquity factor
-    F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
+    double F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
 
     if (ionoutc->vflg == FALSE)
         iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
     else {
-        double t, psi, phi_i, lam_i, phi_m, phi_m2, phi_m3;
-        double AMP, PER, X, X2, X4;
 
         // Earth's central angle between the user position and the earth projection of
         // ionospheric intersection point (semi-circles)
-        psi = 0.0137 / (E + 0.11) - 0.022;
+        double psi = 0.0137 / (E + 0.11) - 0.022;
 
         // Geodetic latitude of the earth projection of the ionospheric intersection point
         // (semi-circles)
-        phi_i = phi_u + psi * cos(azel[0]);
+        double phi_i = phi_u + psi * cos(azel[0]);
         if (phi_i > 0.416)
             phi_i = 0.416;
         else if (phi_i < -0.416)
@@ -1125,33 +1098,33 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
 
         // Geodetic longitude of the earth projection of the ionospheric intersection point
         // (semi-circles)
-        lam_i = lam_u + psi * sin(azel[0]) / cos(phi_i * PI);
+        double lam_i = lam_u + psi * sin(azel[0]) / cos(phi_i * PI);
 
         // Geomagnetic latitude of the earth projection of the ionospheric intersection
         // point (mean ionospheric height assumed 350 km) (semi-circles)
-        phi_m  = phi_i + 0.064 * cos((lam_i - 1.617) * PI);
-        phi_m2 = phi_m * phi_m;
-        phi_m3 = phi_m2 * phi_m;
+        double phi_m  = phi_i + 0.064 * cos((lam_i - 1.617) * PI);
+        double phi_m2 = phi_m * phi_m;
+        double phi_m3 = phi_m2 * phi_m;
 
-        AMP = ionoutc->alpha0 + ionoutc->alpha1 * phi_m + ionoutc->alpha2 * phi_m2 + ionoutc->alpha3 * phi_m3;
+        double AMP = ionoutc->alpha0 + ionoutc->alpha1 * phi_m + ionoutc->alpha2 * phi_m2 + ionoutc->alpha3 * phi_m3;
         if (AMP < 0.0) AMP = 0.0;
 
-        PER = ionoutc->beta0 + ionoutc->beta1 * phi_m + ionoutc->beta2 * phi_m2 + ionoutc->beta3 * phi_m3;
+        double PER = ionoutc->beta0 + ionoutc->beta1 * phi_m + ionoutc->beta2 * phi_m2 + ionoutc->beta3 * phi_m3;
         if (PER < 72000.0) PER = 72000.0;
 
         // Local time (sec)
-        t = SECONDS_IN_DAY / 2.0 * lam_i + g.sec;
+        double t = SECONDS_IN_DAY / 2.0 * lam_i + g.sec;
         while (t >= SECONDS_IN_DAY)
             t -= SECONDS_IN_DAY;
         while (t < 0)
             t += SECONDS_IN_DAY;
 
         // Phase (radians)
-        X = 2.0 * PI * (t - 50400.0) / PER;
+        double X = 2.0 * PI * (t - 50400.0) / PER;
 
         if (fabs(X) < 1.57) {
-            X2         = X * X;
-            X4         = X2 * X2;
+            double X2  = X * X;
+            double X4  = X2 * X2;
             iono_delay = F * (5.0e-9 + AMP * (1.0 - X2 / 2.0 + X4 / 24.0)) * SPEED_OF_LIGHT;
         } else
             iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
@@ -1169,9 +1142,6 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
 void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, double xyz[]) {
     double pos[3], vel[3], clk[2];
     double los[3];
-    double tau;
-    double range, rate;
-    double xrot, yrot;
 
     double llh[3], neu[3];
     double tmat[3][3];
@@ -1181,7 +1151,7 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, do
 
     // Receiver to satellite vector and light-time.
     subVect(los, pos, xyz);
-    tau = normVect(los) / SPEED_OF_LIGHT;
+    double tau = normVect(los) / SPEED_OF_LIGHT;
 
     // Extrapolate the satellite position backwards to the transmission time.
     pos[0] -= vel[0] * tau;
@@ -1189,21 +1159,21 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, do
     pos[2] -= vel[2] * tau;
 
     // Earth rotation correction. The change in velocity can be neglected.
-    xrot   = pos[0] + pos[1] * OMEGA_EARTH * tau;
-    yrot   = pos[1] - pos[0] * OMEGA_EARTH * tau;
-    pos[0] = xrot;
-    pos[1] = yrot;
+    double xrot = pos[0] + pos[1] * OMEGA_EARTH * tau;
+    double yrot = pos[1] - pos[0] * OMEGA_EARTH * tau;
+    pos[0]      = xrot;
+    pos[1]      = yrot;
 
     // New observer to satellite vector and satellite range.
     subVect(los, pos, xyz);
-    range  = normVect(los);
-    rho->d = range;
+    double range = normVect(los);
+    rho->d       = range;
 
     // Pseudorange.
     rho->range = range - SPEED_OF_LIGHT * clk[0];
 
     // Relative velocity of SV and receiver.
-    rate = dotProd(vel, los) / range;
+    double rate = dotProd(vel, los) / range;
 
     // Pseudorange rate.
     rho->rate = rate; // - SPEED_OF_LIGHT*clk[1];
@@ -1228,21 +1198,18 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, do
  *  \param[in dt delta-t (time difference) in seconds
  */
 void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
-    double ms;
-    int    ims;
-    double rhorate;
 
     // Pseudorange rate.
-    rhorate = (rho1.range - chan->rho0.range) / dt;
+    double rhorate = (rho1.range - chan->rho0.range) / dt;
 
     // Carrier and code frequency.
     chan->f_carr = -rhorate / LAMBDA_L1;
     chan->f_code = CODE_FREQ + chan->f_carr * CARR_TO_CODE;
 
     // Initial code phase and data bit counters.
-    ms = (subGpsTime(chan->rho0.g, chan->g0) + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
+    double ms = (subGpsTime(chan->rho0.g, chan->g0) + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
 
-    ims              = static_cast<int>(ms);
+    int ims          = static_cast<int>(ms);
     chan->code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
 
     chan->iword = ims / 600; // 1 word = 30 bits = 600 ms
@@ -1269,7 +1236,6 @@ int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     FILE  *fp;
     int    numd;
     char   str[MAX_CHAR];
-    double t, x, y, z;
 
     if (nullptr == (fp = fopen(filename, "rt"))) {
         return -1;
@@ -1280,8 +1246,10 @@ int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
             break;
         }
 
-        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &x, &y, &z)) // Read CSV line
+        double t, x, y, z;
+        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &x, &y, &z)) { // Read CSV line
             break;
+        }
 
         xyz[numd][0] = x;
         xyz[numd][1] = y;
@@ -1335,7 +1303,6 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     FILE  *fp;
     int    numd = 0;
     char   str[MAX_CHAR];
-    char  *token;
     double llh[3], pos[3];
     char   tmp[8];
 
@@ -1344,7 +1311,7 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     while (1) {
         if (fgets(str, MAX_CHAR, fp) == nullptr) break;
 
-        token = strtok(str, ",");
+        char *token = strtok(str, ",");
 
         if (strncmp(token + 3, "GGA", 3) == 0) {
             token = strtok(nullptr, ","); // Date and time
@@ -1405,9 +1372,8 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
 }
 
 int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
-    int           iwrd, isbf;
+    int           iwrd;
     gpstime_t     g0;
-    unsigned long wn, tow;
     unsigned      sbfwrd;
     unsigned long prevwrd;
     int           nib;
@@ -1416,8 +1382,8 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     g0.sec   = static_cast<double>((unsigned long)(g.sec + 0.5) / 30UL) * 30.0; // Align with the full frame length = 30 sec
     chan->g0 = g0;                                                              // Data bit reference time
 
-    wn  = static_cast<unsigned long>(g0.week % 1024);
-    tow = static_cast<unsigned long>(g0.sec) / 6UL;
+    unsigned long wn  = static_cast<unsigned long>(g0.week % 1024);
+    unsigned long tow = static_cast<unsigned long>(g0.sec) / 6UL;
 
     if (init == 1) // Initialize subframe 5
     {
@@ -1453,7 +1419,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
         */
     }
 
-    for (isbf = 0; isbf < N_SBF; isbf++) {
+    for (int isbf = 0; isbf < N_SBF; isbf++) {
         tow++;
 
         for (iwrd = 0; iwrd < N_DWRD_SBF; iwrd++) {
@@ -1499,15 +1465,13 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
 
 int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, double *xyz, double elvMask) {
     int    nsat = 0;
-    int    i, sv;
+    int    i;
     double azel[2];
 
     range_t rho;
     double  ref[3] = {0.0};
-    double  r_ref, r_xyz;
-    double  phase_ini;
 
-    for (sv = 0; sv < MAX_SAT; sv++) {
+    for (int sv = 0; sv < MAX_SAT; sv++) {
         if (checkSatVisibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
             nsat++; // Number of visible satellites
 
@@ -1535,13 +1499,13 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
                         chan[i].rho0 = rho;
 
                         // Initialize carrier phase
-                        r_xyz = rho.range;
+                        double r_xyz = rho.range;
 
                         computeRange(&rho, eph[sv], &ionoutc, grx, ref);
-                        r_ref = rho.range;
+                        double r_ref = rho.range;
 
-                        phase_ini = 0.0; // TODO: Must initialize properly
-                                         // phase_ini = (2.0*r_ref - r_xyz)/LAMBDA_L1;
+                        double phase_ini = 0.0; // TODO: Must initialize properly
+                                                // phase_ini = (2.0*r_ref - r_xyz)/LAMBDA_L1;
 #ifdef FLOAT_CARR_PHASE
                         chan[i].carr_phase = phase_ini - floor(phase_ini);
 #else
