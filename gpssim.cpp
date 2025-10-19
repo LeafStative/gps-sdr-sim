@@ -187,24 +187,22 @@ void date2gps(const datetime_t *t, gpstime_t *g) {
 
     // Convert time to GPS weeks and seconds.
     g->week = de / 7;
-    g->sec  = (double)(de % 7) * SECONDS_IN_DAY + t->hh * SECONDS_IN_HOUR + t->mm * SECONDS_IN_MINUTE + t->sec;
-
-    return;
+    g->sec  = static_cast<double>(de % 7) * SECONDS_IN_DAY + t->hh * SECONDS_IN_HOUR + t->mm * SECONDS_IN_MINUTE + t->sec;
 }
 
 void gps2date(const gpstime_t *g, datetime_t *t) {
     // Convert Julian day number to calendar date
-    int c = (int)(7 * g->week + floor(g->sec / 86400.0) + 2444245.0) + 1537;
-    int d = (int)((c - 122.1) / 365.25);
+    int c = static_cast<int>(7 * g->week + std::floor(g->sec / 86400.0) + 2444245.0) + 1537;
+    int d = static_cast<int>((c - 122.1) / 365.25);
     int e = 365 * d + d / 4;
-    int f = (int)((c - e) / 30.6001);
+    int f = static_cast<int>((c - e) / 30.6001);
 
-    t->d = c - e - (int)(30.6001 * f);
+    t->d = c - e - static_cast<int>(30.6001 * f);
     t->m = f - 1 - 12 * (f / 14);
     t->y = d - 4715 - ((7 + t->m) / 10);
 
-    t->hh  = ((int)(g->sec / 3600.0)) % 24;
-    t->mm  = ((int)(g->sec / 60.0)) % 60;
+    t->hh  = static_cast<int>(g->sec / 3600.0) % 24;
+    t->mm  = static_cast<int>(g->sec / 60.0) % 60;
     t->sec = g->sec - 60.0 * floor(g->sec / 60.0);
 
     return;
@@ -514,55 +512,55 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     // FIXED: This has to be the "transmission" week number, not for the ephemeris reference time
     // wn = (unsigned long)(eph.toe.week%1024);
     wn     = 0UL;
-    toe    = (unsigned long)(eph.toe.sec / 16.0);
-    toc    = (unsigned long)(eph.toc.sec / 16.0);
-    iode   = (unsigned long)(eph.iode);
-    iodc   = (unsigned long)(eph.iodc);
-    deltan = (long)(eph.deltan / POW2_M43 / PI);
-    cuc    = (long)(eph.cuc / POW2_M29);
-    cus    = (long)(eph.cus / POW2_M29);
-    cic    = (long)(eph.cic / POW2_M29);
-    cis    = (long)(eph.cis / POW2_M29);
-    crc    = (long)(eph.crc / POW2_M5);
-    crs    = (long)(eph.crs / POW2_M5);
-    ecc    = (unsigned long)(eph.ecc / POW2_M33);
-    sqrta  = (unsigned long)(eph.sqrta / POW2_M19);
-    m0     = (long)(eph.m0 / POW2_M31 / PI);
-    omg0   = (long)(eph.omg0 / POW2_M31 / PI);
-    inc0   = (long)(eph.inc0 / POW2_M31 / PI);
-    aop    = (long)(eph.aop / POW2_M31 / PI);
-    omgdot = (long)(eph.omgdot / POW2_M43 / PI);
-    idot   = (long)(eph.idot / POW2_M43 / PI);
-    af0    = (long)(eph.af0 / POW2_M31);
-    af1    = (long)(eph.af1 / POW2_M43);
-    af2    = (long)(eph.af2 / POW2_M55);
-    tgd    = (long)(eph.tgd / POW2_M31);
-    svhlth = (unsigned long)(eph.svhlth);
-    codeL2 = (unsigned long)(eph.codeL2);
+    toe    = static_cast<unsigned long>(eph.toe.sec / 16.0);
+    toc    = static_cast<unsigned long>(eph.toc.sec / 16.0);
+    iode   = static_cast<unsigned long>(eph.iode);
+    iodc   = static_cast<unsigned long>(eph.iodc);
+    deltan = static_cast<long>(eph.deltan / POW2_M43 / PI);
+    cuc    = static_cast<long>(eph.cuc / POW2_M29);
+    cus    = static_cast<long>(eph.cus / POW2_M29);
+    cic    = static_cast<long>(eph.cic / POW2_M29);
+    cis    = static_cast<long>(eph.cis / POW2_M29);
+    crc    = static_cast<long>(eph.crc / POW2_M5);
+    crs    = static_cast<long>(eph.crs / POW2_M5);
+    ecc    = static_cast<unsigned long>(eph.ecc / POW2_M33);
+    sqrta  = static_cast<unsigned long>(eph.sqrta / POW2_M19);
+    m0     = static_cast<long>(eph.m0 / POW2_M31 / PI);
+    omg0   = static_cast<long>(eph.omg0 / POW2_M31 / PI);
+    inc0   = static_cast<long>(eph.inc0 / POW2_M31 / PI);
+    aop    = static_cast<long>(eph.aop / POW2_M31 / PI);
+    omgdot = static_cast<long>(eph.omgdot / POW2_M43 / PI);
+    idot   = static_cast<long>(eph.idot / POW2_M43 / PI);
+    af0    = static_cast<long>(eph.af0 / POW2_M31);
+    af1    = static_cast<long>(eph.af1 / POW2_M43);
+    af2    = static_cast<long>(eph.af2 / POW2_M55);
+    tgd    = static_cast<long>(eph.tgd / POW2_M31);
+    svhlth = static_cast<unsigned long>(eph.svhlth);
+    codeL2 = static_cast<unsigned long>(eph.codeL2);
 
-    wna = (unsigned long)(eph.toe.week % 256);
-    toa = (unsigned long)(eph.toe.sec / 4096.0);
+    wna = static_cast<unsigned long>(eph.toe.week % 256);
+    toa = static_cast<unsigned long>(eph.toe.sec / 4096.0);
 
-    alpha0 = (signed long)round(ionoutc.alpha0 / POW2_M30);
-    alpha1 = (signed long)round(ionoutc.alpha1 / POW2_M27);
-    alpha2 = (signed long)round(ionoutc.alpha2 / POW2_M24);
-    alpha3 = (signed long)round(ionoutc.alpha3 / POW2_M24);
-    beta0  = (signed long)round(ionoutc.beta0 / 2048.0);
-    beta1  = (signed long)round(ionoutc.beta1 / 16384.0);
-    beta2  = (signed long)round(ionoutc.beta2 / 65536.0);
-    beta3  = (signed long)round(ionoutc.beta3 / 65536.0);
-    A0     = (signed long)round(ionoutc.A0 / POW2_M30);
-    A1     = (signed long)round(ionoutc.A1 / POW2_M50);
-    dtls   = (signed long)(ionoutc.dtls);
-    tot    = (unsigned long)(ionoutc.tot / 4096);
-    wnt    = (unsigned long)(ionoutc.wnt % 256);
+    alpha0 = static_cast<signed long>(round(ionoutc.alpha0 / POW2_M30));
+    alpha1 = static_cast<signed long>(round(ionoutc.alpha1 / POW2_M27));
+    alpha2 = static_cast<signed long>(round(ionoutc.alpha2 / POW2_M24));
+    alpha3 = static_cast<signed long>(round(ionoutc.alpha3 / POW2_M24));
+    beta0  = static_cast<signed long>(round(ionoutc.beta0 / 2048.0));
+    beta1  = static_cast<signed long>(round(ionoutc.beta1 / 16384.0));
+    beta2  = static_cast<signed long>(round(ionoutc.beta2 / 65536.0));
+    beta3  = static_cast<signed long>(round(ionoutc.beta3 / 65536.0));
+    A0     = static_cast<signed long>(round(ionoutc.A0 / POW2_M30));
+    A1     = static_cast<signed long>(round(ionoutc.A1 / POW2_M50));
+    dtls   = static_cast<signed long>(ionoutc.dtls);
+    tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
+    wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
 
     // 2016/12/31 (Sat) -> WNlsf = 1929, DN = 7 (http://navigationservices.agi.com/GNSSWeb/)
     // Days are counted from 1 to 7 (Sunday is 1).
     if (ionoutc.leapen == TRUE) {
-        wnlsf = (unsigned long)(ionoutc.wnlsf % 256);
-        dn    = (unsigned long)(ionoutc.dn);
-        dtlsf = (unsigned long)(ionoutc.dtlsf);
+        wnlsf = static_cast<unsigned long>(ionoutc.wnlsf % 256);
+        dn    = static_cast<unsigned long>(ionoutc.dn);
+        dtlsf = static_cast<unsigned long>(ionoutc.dtlsf);
     } else {
         wnlsf = 1929 % 256;
         dn    = 7;
@@ -752,7 +750,7 @@ double subGpsTime(gpstime_t g1, gpstime_t g0) {
     double dt;
 
     dt = g1.sec - g0.sec;
-    dt += (double)(g1.week - g0.week) * SECONDS_IN_WEEK;
+    dt += static_cast<double>(g1.week - g0.week) * SECONDS_IN_WEEK;
 
     return (dt);
 }
@@ -968,7 +966,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         strncpy(tmp, str + 3, 19);
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].iode = (int)atof(tmp);
+        eph[ieph][sv].iode = static_cast<int>(atof(tmp));
 
         strncpy(tmp, str + 22, 19);
         tmp[19] = 0;
@@ -1065,12 +1063,12 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         strncpy(tmp, str + 22, 19);
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].codeL2 = (int)atof(tmp);
+        eph[ieph][sv].codeL2 = static_cast<int>(atof(tmp));
 
         strncpy(tmp, str + 41, 19);
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].toe.week = (int)atof(tmp);
+        eph[ieph][sv].toe.week = static_cast<int>(atof(tmp));
 
         // BROADCAST ORBIT - 6
         if (NULL == fgets(str, MAX_CHAR, fp)) break;
@@ -1078,7 +1076,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         strncpy(tmp, str + 22, 19);
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].svhlth = (int)atof(tmp);
+        eph[ieph][sv].svhlth = static_cast<int>(atof(tmp));
         if ((eph[ieph][sv].svhlth > 0) && (eph[ieph][sv].svhlth < 32)) eph[ieph][sv].svhlth += 32; // Set MSB to 1
 
         strncpy(tmp, str + 41, 19);
@@ -1089,7 +1087,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         strncpy(tmp, str + 60, 19);
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].iodc = (int)atof(tmp);
+        eph[ieph][sv].iodc = static_cast<int>(atof(tmp));
 
         // BROADCAST ORBIT - 7
         if (NULL == fgets(str, MAX_CHAR, fp)) break;
@@ -1263,8 +1261,8 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
     // Initial code phase and data bit counters.
     ms = ((subGpsTime(chan->rho0.g, chan->g0) + 6.0) - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
 
-    ims              = (int)ms;
-    chan->code_phase = (ms - (double)ims) * CA_SEQ_LEN; // in chip
+    ims              = static_cast<int>(ms);
+    chan->code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
 
     chan->iword = ims / 600; // 1 word = 30 bits = 600 ms
     ims -= chan->iword * 600;
@@ -1274,8 +1272,8 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
 
     chan->icode = ims; // 1 code = 1 ms
 
-    chan->codeCA  = chan->ca[(int)chan->code_phase] * 2 - 1;
-    chan->dataBit = (int)((chan->dwrd[chan->iword] >> (29 - chan->ibit)) & 0x1UL) * 2 - 1;
+    chan->codeCA  = chan->ca[static_cast<int>(chan->code_phase)] * 2 - 1;
+    chan->dataBit = static_cast<int>((chan->dwrd[chan->iword] >> (29 - chan->ibit)) & 0x1UL) * 2 - 1;
 
     // Save current pseudorange
     chan->rho0 = rho1;
@@ -1432,11 +1430,11 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     int           nib;
 
     g0.week  = g.week;
-    g0.sec   = (double)(((unsigned long)(g.sec + 0.5)) / 30UL) * 30.0; // Align with the full frame length = 30 sec
-    chan->g0 = g0;                                                     // Data bit reference time
+    g0.sec   = static_cast<double>(((unsigned long)(g.sec + 0.5)) / 30UL) * 30.0; // Align with the full frame length = 30 sec
+    chan->g0 = g0;                                                                // Data bit reference time
 
-    wn  = (unsigned long)(g0.week % 1024);
-    tow = ((unsigned long)g0.sec) / 6UL;
+    wn  = static_cast<unsigned long>(g0.week % 1024);
+    tow = static_cast<unsigned long>(g0.sec) / 6UL;
 
     if (init == 1) // Initialize subframe 5
     {
@@ -1565,7 +1563,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
                         chan[i].carr_phase = phase_ini - floor(phase_ini);
 #else
                         phase_ini -= floor(phase_ini);
-                        chan[i].carr_phase = (unsigned int)(512.0 * 65536.0 * phase_ini);
+                        chan[i].carr_phase = static_cast<unsigned int>(512.0 * 65536.0 * phase_ini);
 #endif
                         // Done.
                         break;
@@ -1609,7 +1607,7 @@ void usage(void) {
         "  -i               Disable ionospheric delay for spacecraft scenario\n"
         "  -p [fixed_gain]  Disable path loss and hold power level constant\n"
         "  -v               Show details about simulated channels\n",
-        ((double)USER_MOTION_SIZE) / 10.0,
+        static_cast<double>(USER_MOTION_SIZE) / 10.0,
         STATIC_MAX_DURATION);
 
     return;
@@ -1690,7 +1688,7 @@ int main(int argc, char *argv[]) {
     data_format    = SC16;
     g0.week        = -1; // Invalid start time
     iduration      = USER_MOTION_SIZE;
-    duration       = (double)iduration / 10.0; // Default duration
+    duration       = static_cast<double>(iduration) / 10.0; // Default duration
     verb           = FALSE;
     ionoutc.enable = TRUE;
     ionoutc.leapen = FALSE;
@@ -1781,7 +1779,7 @@ int main(int argc, char *argv[]) {
                 t0.d   = gmt->tm_mday;
                 t0.hh  = gmt->tm_hour;
                 t0.mm  = gmt->tm_min;
-                t0.sec = (double)gmt->tm_sec;
+                t0.sec = static_cast<double>(gmt->tm_sec);
 
                 date2gps(&t0, &g0);
 
@@ -1840,16 +1838,16 @@ int main(int argc, char *argv[]) {
         llh[2]             = 10.0;
     }
 
-    if (duration < 0.0 || (duration > ((double)USER_MOTION_SIZE) / 10.0 && !staticLocationMode) ||
+    if (duration < 0.0 || (duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !staticLocationMode) ||
         (duration > STATIC_MAX_DURATION && staticLocationMode)) {
         fprintf(stderr, "ERROR: Invalid duration.\n");
         exit(1);
     }
-    iduration = (int)(duration * 10.0 + 0.5);
+    iduration = static_cast<int>(duration * 10.0 + 0.5);
 
     // Buffer size
     samp_freq    = floor(samp_freq / 10.0);
-    iq_buff_size = (int)samp_freq; // samples per 0.1sec
+    iq_buff_size = static_cast<int>(samp_freq); // samples per 0.1sec
     samp_freq *= 10.0;
 
     delt = 1.0 / samp_freq;
@@ -1948,13 +1946,13 @@ int main(int argc, char *argv[]) {
             double     dsec;
 
             gtmp.week = g0.week;
-            gtmp.sec  = (double)(((int)(g0.sec)) / 7200) * 7200.0;
+            gtmp.sec  = static_cast<double>(((int)(g0.sec)) / 7200) * 7200.0;
 
             dsec = subGpsTime(gtmp, gmin);
 
             // Overwrite the UTC reference week number
             ionoutc.wnt = gtmp.week;
-            ionoutc.tot = (int)gtmp.sec;
+            ionoutc.tot = static_cast<int>(gtmp.sec);
 
             // Iono/UTC parameters may no longer valid
             // ionoutc.vflg = FALSE;
@@ -2017,7 +2015,7 @@ int main(int argc, char *argv[]) {
         t0.sec,
         g0.week,
         g0.sec);
-    fprintf(stderr, "Duration = %.1f [sec]\n", ((double)numd) / 10.0);
+    fprintf(stderr, "Duration = %.1f [sec]\n", static_cast<double>(numd) / 10.0);
 
     // Select the current set of ephemerides
     ieph = -1;
@@ -2144,18 +2142,18 @@ int main(int argc, char *argv[]) {
                 // Update code phase and data bit counters
                 computeCodePhase(&chan[i], rho, 0.1);
 #ifndef FLOAT_CARR_PHASE
-                chan[i].carr_phasestep = (int)round(512.0 * 65536.0 * chan[i].f_carr * delt);
+                chan[i].carr_phasestep = static_cast<int>(round(512.0 * 65536.0 * chan[i].f_carr * delt));
 #endif
                 // Path loss
                 path_loss = 20200000.0 / rho.d;
 
                 // Receiver antenna gain
-                ibs      = (int)((90.0 - rho.azel[1] * R2D) / 5.0); // covert elevation to boresight
+                ibs      = static_cast<int>((90.0 - rho.azel[1] * R2D) / 5.0); // covert elevation to boresight
                 ant_gain = ant_pat[ibs];
 
                 // Signal gain
                 if (path_loss_enable == TRUE)
-                    gain[i] = (int)(path_loss * ant_gain * 128.0); // scaled by 2^7
+                    gain[i] = static_cast<int>(path_loss * ant_gain * 128.0); // scaled by 2^7
                 else
                     gain[i] = fixed_gain; // hold the power level constant
             }
@@ -2203,12 +2201,13 @@ int main(int argc, char *argv[]) {
                             }
 
                             // Set new navigation data bit
-                            chan[i].dataBit = (int)((chan[i].dwrd[chan[i].iword] >> (29 - chan[i].ibit)) & 0x1UL) * 2 - 1;
+                            chan[i].dataBit =
+                                static_cast<int>((chan[i].dwrd[chan[i].iword] >> (29 - chan[i].ibit)) & 0x1UL) * 2 - 1;
                         }
                     }
 
                     // Set current code chip
-                    chan[i].codeCA = chan[i].ca[(int)chan[i].code_phase] * 2 - 1;
+                    chan[i].codeCA = chan[i].ca[static_cast<int>(chan[i].code_phase)] * 2 - 1;
 
                     // Update carrier phase
 #ifdef FLOAT_CARR_PHASE
@@ -2229,8 +2228,8 @@ int main(int argc, char *argv[]) {
             q_acc = (q_acc + 64) >> 7;
 
             // Store I/Q samples into buffer
-            iq_buff[isamp * 2]     = (short)i_acc;
-            iq_buff[isamp * 2 + 1] = (short)q_acc;
+            iq_buff[isamp * 2]     = static_cast<short>(i_acc);
+            iq_buff[isamp * 2 + 1] = static_cast<short>(q_acc);
         }
 
         if (data_format == SC01) {
@@ -2257,7 +2256,7 @@ int main(int argc, char *argv[]) {
         // Update navigation message and channel allocation every 30 seconds
         //
 
-        igrx = (int)(grx.sec * 10.0 + 0.5);
+        igrx = static_cast<int>(grx.sec * 10.0 + 0.5);
 
         if (igrx % 300 == 0) // Every 30 seconds
         {
@@ -2326,7 +2325,7 @@ int main(int argc, char *argv[]) {
     fclose(fp);
 
     // Process time
-    fprintf(stderr, "Process time = %.1f [sec]\n", (double)(tend - tstart) / CLOCKS_PER_SEC);
+    fprintf(stderr, "Process time = %.1f [sec]\n", static_cast<double>(tend - tstart) / CLOCKS_PER_SEC);
 
     return (0);
 }
