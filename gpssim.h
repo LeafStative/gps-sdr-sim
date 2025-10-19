@@ -3,19 +3,21 @@
 #ifndef GPSSIM_H
 #define GPSSIM_H
 
+#include <numbers>
+
 // #define FLOAT_CARR_PHASE // For RKT simulation. Higher computational load, but smoother carrier phase.
 
 #define TRUE (1)
 #define FALSE (0)
 
 /*! \brief Maximum length of a line in a text file (RINEX, motion) */
-#define MAX_CHAR (100)
+constexpr auto MAX_CHAR = 100;
 
 /*! \brief Maximum number of satellites in RINEX file */
-#define MAX_SAT (32)
+constexpr size_t MAX_SAT = 32;
 
 /*! \brief Maximum number of channels we simulate */
-#define MAX_CHAN (16)
+constexpr auto MAX_CHAN = 16;
 
 /*! \brief Maximum number of user motion points */
 #ifndef USER_MOTION_SIZE
@@ -23,64 +25,64 @@
 #endif
 
 /*! \brief Maximum duration for static mode*/
-#define STATIC_MAX_DURATION (86400) // second
+constexpr auto STATIC_MAX_DURATION = 86400; // second
 
 /*! \brief Number of subframes */
-#define N_SBF (5) // 5 subframes per frame
+constexpr size_t N_SBF = 5; // 5 subframes per frame
 
 /*! \brief Number of words per subframe */
-#define N_DWRD_SBF (10) // 10 word per subframe
+constexpr size_t N_DWRD_SBF = 10; // 10 word per subframe
 
 /*! \brief Number of words */
-#define N_DWRD ((N_SBF + 1) * N_DWRD_SBF) // Subframe word buffer size
+constexpr auto N_DWRD = (N_SBF + 1) * N_DWRD_SBF; // Subframe word buffer size
 
 /*! \brief C/A code sequence length */
-#define CA_SEQ_LEN (1023)
+constexpr auto CA_SEQ_LEN = 1023;
 
-#define SECONDS_IN_WEEK 604800.0
-#define SECONDS_IN_HALF_WEEK 302400.0
-#define SECONDS_IN_DAY 86400.0
-#define SECONDS_IN_HOUR 3600.0
-#define SECONDS_IN_MINUTE 60.0
+constexpr auto SECONDS_IN_WEEK      = 604800.0;
+constexpr auto SECONDS_IN_HALF_WEEK = 302400.0;
+constexpr auto SECONDS_IN_DAY       = 86400.0;
+constexpr auto SECONDS_IN_HOUR      = 3600.0;
+constexpr auto SECONDS_IN_MINUTE    = 60.0;
 
-#define POW2_M5 0.03125
-#define POW2_M19 1.907348632812500e-6
-#define POW2_M29 1.862645149230957e-9
-#define POW2_M31 4.656612873077393e-10
-#define POW2_M33 1.164153218269348e-10
-#define POW2_M43 1.136868377216160e-13
-#define POW2_M55 2.775557561562891e-17
+constexpr auto POW2_M5  = 0.03125;
+constexpr auto POW2_M19 = 1.907348632812500e-6;
+constexpr auto POW2_M29 = 1.862645149230957e-9;
+constexpr auto POW2_M31 = 4.656612873077393e-10;
+constexpr auto POW2_M33 = 1.164153218269348e-10;
+constexpr auto POW2_M43 = 1.136868377216160e-13;
+constexpr auto POW2_M55 = 2.775557561562891e-17;
 
-#define POW2_M50 8.881784197001252e-016
-#define POW2_M30 9.313225746154785e-010
-#define POW2_M27 7.450580596923828e-009
-#define POW2_M24 5.960464477539063e-008
+constexpr auto POW2_M50 = 8.881784197001252e-016;
+constexpr auto POW2_M30 = 9.313225746154785e-010;
+constexpr auto POW2_M27 = 7.450580596923828e-009;
+constexpr auto POW2_M24 = 5.960464477539063e-008;
 
 // Conventional values employed in GPS ephemeris model (ICD-GPS-200)
-#define GM_EARTH 3.986005e14
-#define OMEGA_EARTH 7.2921151467e-5
-#define PI 3.1415926535898
+constexpr auto GM_EARTH    = 3.986005e14;
+constexpr auto OMEGA_EARTH = 7.2921151467e-5;
+constexpr auto PI          = std::numbers::pi;
 
-#define WGS84_RADIUS 6378137.0
-#define WGS84_ECCENTRICITY 0.0818191908426
+constexpr auto WGS84_RADIUS       = 6378137.0;
+constexpr auto WGS84_ECCENTRICITY = 0.0818191908426;
 
-#define R2D 57.2957795131
+constexpr auto R2D = 57.2957795131;
 
-#define SPEED_OF_LIGHT 2.99792458e8
-#define LAMBDA_L1 0.190293672798365
+constexpr auto SPEED_OF_LIGHT = 2.99792458e8;
+constexpr auto LAMBDA_L1      = 0.190293672798365;
 
 /*! \brief GPS L1 Carrier frequency */
-#define CARR_FREQ (1575.42e6)
+constexpr auto CARR_FREQ = 1575.42e6;
 /*! \brief C/A code frequency */
-#define CODE_FREQ (1.023e6)
-#define CARR_TO_CODE (1.0 / 1540.0)
+constexpr auto CODE_FREQ    = 1.023e6;
+constexpr auto CARR_TO_CODE = 1.0 / 1540.0;
 
 // Sampling data format
-#define SC01 (1)
-#define SC08 (8)
-#define SC16 (16)
+constexpr auto SC01 = 1;
+constexpr auto SC08 = 8;
+constexpr auto SC16 = 16;
 
-#define EPHEM_ARRAY_SIZE (15) // for daily GPS broadcast ephemers file (brdc)
+constexpr auto EPHEM_ARRAY_SIZE = 15; // for daily GPS broadcast ephemers file (brdc)
 
 /*! \brief Structure representing GPS time */
 struct gpstime_t {
