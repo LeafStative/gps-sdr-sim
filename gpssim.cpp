@@ -108,8 +108,6 @@ void subVect(double *y, const double *x1, const double *x2) {
     y[0] = x1[0] - x2[0];
     y[1] = x1[1] - x2[1];
     y[2] = x1[2] - x2[2];
-
-    return;
 }
 
 /*! \brief Compute Norm of Vector
@@ -163,8 +161,6 @@ void codegen(int *ca, int prn) {
 
     for (i = 0, j = CA_SEQ_LEN - delay[prn - 1]; i < CA_SEQ_LEN; i++, j++)
         ca[i] = (1 - g1[i] * g2[j % CA_SEQ_LEN]) / 2;
-
-    return;
 }
 
 /*! \brief Convert a UTC date into a GPS date
@@ -205,8 +201,6 @@ void gps2date(const gpstime_t *g, datetime_t *t) {
     t->hh  = static_cast<int>(g->sec / 3600.0) % 24;
     t->mm  = static_cast<int>(g->sec / 60.0) % 60;
     t->sec = g->sec - 60.0 * floor(g->sec / 60.0);
-
-    return;
 }
 
 /*! \brief Convert Earth-centered Earth-fixed (ECEF) into Lat/Long/Height
@@ -255,8 +249,6 @@ void xyz2llh(const double *xyz, double *llh) {
     llh[0] = atan2(zdz, sqrt(rho2));
     llh[1] = atan2(y, x);
     llh[2] = nh - n;
-
-    return;
 }
 
 /*! \brief Convert Lat/Long/Height into Earth-centered Earth-fixed (ECEF)
@@ -318,8 +310,6 @@ void ltcmat(const double *llh, double t[3][3]) {
     t[2][0] = clat * clon;
     t[2][1] = clat * slon;
     t[2][2] = slat;
-
-    return;
 }
 
 /*! \brief Convert Earth-centered Earth-Fixed to ?
@@ -331,8 +321,6 @@ void ecef2neu(const double *xyz, double t[3][3], double *neu) {
     neu[0] = t[0][0] * xyz[0] + t[0][1] * xyz[1] + t[0][2] * xyz[2];
     neu[1] = t[1][0] * xyz[0] + t[1][1] * xyz[1] + t[1][2] * xyz[2];
     neu[2] = t[2][0] * xyz[0] + t[2][1] * xyz[1] + t[2][2] * xyz[2];
-
-    return;
 }
 
 /*! \brief Convert North-East-Up to Azimuth + Elevation
@@ -347,8 +335,6 @@ void neu2azel(double *azel, const double *neu) {
 
     ne      = sqrt(neu[0] * neu[0] + neu[1] * neu[1]);
     azel[1] = atan2(neu[2], ne);
-
-    return;
 }
 
 /*! \brief Compute Satellite position, velocity and clock at given time
@@ -459,8 +445,6 @@ void satpos(ephem_t eph, gpstime_t g, double *pos, double *vel, double *clk) {
 
     clk[0] = eph.af0 + tk * (eph.af1 + tk * eph.af2) + relativistic - eph.tgd;
     clk[1] = eph.af1 + 2.0 * tk * eph.af2;
-
-    return;
 }
 
 /*! \brief Compute Subframe from Ephemeris
@@ -642,8 +626,6 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[4][7] = 0UL;
     sbf[4][8] = 0UL;
     sbf[4][9] = 0UL;
-
-    return;
 }
 
 /*! \brief Count number of bits set to 1
@@ -1238,8 +1220,6 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, do
     // Add ionospheric delay
     rho->iono_delay = ionosphericDelay(ionoutc, g, llh, rho->azel);
     rho->range += rho->iono_delay;
-
-    return;
 }
 
 /*! \brief Compute the code phase for a given channel (satellite)
@@ -1278,8 +1258,6 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
 
     // Save current pseudorange
     chan->rho0 = rho1;
-
-    return;
 }
 
 /*! \brief Read the list of user motions from the input file
@@ -1614,8 +1592,6 @@ void usage(void) {
         "  -v               Show details about simulated channels\n",
         static_cast<double>(USER_MOTION_SIZE) / 10.0,
         STATIC_MAX_DURATION);
-
-    return;
 }
 
 int main(int argc, char *argv[]) {
