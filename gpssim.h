@@ -83,23 +83,23 @@
 #define EPHEM_ARRAY_SIZE (15) // for daily GPS broadcast ephemers file (brdc)
 
 /*! \brief Structure representing GPS time */
-typedef struct {
+struct gpstime_t {
     int    week; /*!< GPS week number (since January 1980) */
     double sec;  /*!< second inside the GPS \a week */
-} gpstime_t;
+};
 
 /*! \brief Structure repreenting UTC time */
-typedef struct {
+struct datetime_t {
     int    y;   /*!< Calendar year */
     int    m;   /*!< Calendar month */
     int    d;   /*!< Calendar day */
     int    hh;  /*!< Calendar hour */
     int    mm;  /*!< Calendar minutes */
     double sec; /*!< Calendar seconds */
-} datetime_t;
+};
 
 /*! \brief Structure representing ephemeris of a single satellite */
-typedef struct {
+struct ephem_t {
     int        vflg; /*!< Valid Flag */
     datetime_t t;
     gpstime_t  toc;    /*!< Time of Clock */
@@ -132,9 +132,9 @@ typedef struct {
     double sq1e2;   /*!< sqrt(1-e^2) */
     double A;       /*!< Semi-major axis */
     double omgkdot; /*!< OmegaDot-OmegaEdot */
-} ephem_t;
+};
 
-typedef struct {
+struct ionoutc_t {
     int    enable;
     int    vflg;
     double alpha0, alpha1, alpha2, alpha3;
@@ -144,19 +144,19 @@ typedef struct {
     int    dtlsf, dn, wnlsf;
     // enable custom leap event
     int leapen;
-} ionoutc_t;
+};
 
-typedef struct {
+struct range_t {
     gpstime_t g;
     double    range; // pseudorange
     double    rate;
     double    d; // geometric distance
     double    azel[2];
     double    iono_delay;
-} range_t;
+};
 
 /*! \brief Structure representing a Channel */
-typedef struct {
+struct channel_t {
     int    prn;            /*< PRN Number */
     int    ca[CA_SEQ_LEN]; /*< C/A Sequence */
     double f_carr;         /*< Carrier frequency */
@@ -178,6 +178,6 @@ typedef struct {
     int           codeCA;             /*!< current C/A code */
     double        azel[2];
     range_t       rho0;
-} channel_t;
+};
 
 #endif
