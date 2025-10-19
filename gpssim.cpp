@@ -136,7 +136,9 @@ void codegen(int *ca, int prn) {
                    469, 470, 471, 472, 473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862};
 
 
-    if (prn < 1 || prn > 32) return;
+    if (prn < 1 || prn > 32) {
+        return;
+    }
 
     int r1[N_DWRD_SBF], r2[N_DWRD_SBF];
     for (int i = 0; i < N_DWRD_SBF; i++) {
@@ -766,9 +768,8 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     while (1) {
         if (nullptr == fgets(str, MAX_CHAR, fp)) break;
 
-        if (strncmp(str + 60, "END OF HEADER", 13) == 0)
-            break;
-        else if (strncmp(str + 60, "ION ALPHA", 9) == 0) {
+        if (strncmp(str + 60, "END OF HEADER", 13) == 0) break;
+        if (strncmp(str + 60, "ION ALPHA", 9) == 0) {
             strncpy(tmp, str + 2, 12);
             tmp[12] = 0;
             replaceExpDesignator(tmp, 12);
@@ -1233,9 +1234,9 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
  *  \returns Number of user data motion records read, -1 on error
  */
 int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
-    FILE  *fp;
-    int    numd;
-    char   str[MAX_CHAR];
+    FILE *fp;
+    int   numd;
+    char  str[MAX_CHAR];
 
     if (nullptr == (fp = fopen(filename, "rt"))) {
         return -1;
@@ -1534,7 +1535,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
     return nsat;
 }
 
-void usage(void) {
+void usage() {
     fprintf(
         stderr,
         "Usage: gps-sdr-sim [options]\n"
@@ -1714,8 +1715,8 @@ int main(int argc, char *argv[]) {
         case 'T':
             timeoverwrite = TRUE;
             if (strncmp(optarg, "now", 3) == 0) {
-                time_t     timer;
-                struct tm *gmt;
+                time_t timer;
+                tm    *gmt;
 
                 time(&timer);
                 gmt = gmtime(&timer);
@@ -1814,7 +1815,8 @@ int main(int argc, char *argv[]) {
         if (numd == -1) {
             fprintf(stderr, "ERROR: Failed to open user motion / NMEA GGA file.\n");
             exit(1);
-        } else if (numd == 0) {
+        }
+        if (numd == 0) {
             fprintf(stderr, "ERROR: Failed to read user motion / NMEA GGA data.\n");
             exit(1);
         }
@@ -1848,7 +1850,9 @@ int main(int argc, char *argv[]) {
     if (neph == 0) {
         fprintf(stderr, "ERROR: No ephemeris available.\n");
         exit(1);
-    } else if (neph == -1) {
+    }
+
+    if (neph == -1) {
         fprintf(stderr, "ERROR: ephemeris file not found.\n");
         exit(1);
     }
