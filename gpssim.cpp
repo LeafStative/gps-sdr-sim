@@ -1,10 +1,11 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include <cmath>
 
 #ifdef _WIN32
 #include "getopt.h"
@@ -116,7 +117,7 @@ void subVect(double *y, const double *x1, const double *x2) {
  *  \returns Length (Norm) of the input vector
  */
 double normVect(const double *x) {
-    return (sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]));
+    return std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
 }
 
 /*! \brief Compute dot-product of two vectors
@@ -125,7 +126,7 @@ double normVect(const double *x) {
  *  \returns Dot-product of both multiplicands
  */
 double dotProd(const double *x1, const double *x2) {
-    return (x1[0] * x2[0] + x1[1] * x2[1] + x1[2] * x2[2]);
+    return x1[0] * x2[0] + x1[1] * x2[1] + x1[2] * x2[2];
 }
 
 /* !\brief generate the C/A code sequence for a given Satellite Vehicle PRN
@@ -199,7 +200,7 @@ void gps2date(const gpstime_t *g, datetime_t *t) {
 
     t->d = c - e - static_cast<int>(30.6001 * f);
     t->m = f - 1 - 12 * (f / 14);
-    t->y = d - 4715 - ((7 + t->m) / 10);
+    t->y = d - 4715 - (7 + t->m) / 10;
 
     t->hh  = static_cast<int>(g->sec / 3600.0) % 24;
     t->mm  = static_cast<int>(g->sec / 60.0) % 60;
@@ -342,7 +343,7 @@ void neu2azel(double *azel, const double *neu) {
     double ne;
 
     azel[0] = atan2(neu[1], neu[0]);
-    if (azel[0] < 0.0) azel[0] += (2.0 * PI);
+    if (azel[0] < 0.0) azel[0] += 2.0 * PI;
 
     ne      = sqrt(neu[0] * neu[0] + neu[1] * neu[1]);
     azel[1] = atan2(neu[2], ne);
@@ -569,58 +570,58 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     // Subframe 1
     sbf[0][0] = 0x8B0000UL << 6;
     sbf[0][1] = 0x1UL << 8;
-    sbf[0][2] = ((wn & 0x3FFUL) << 20) | ((codeL2 & 0x3UL) << 18) | ((ura & 0xFUL) << 14) | ((svhlth & 0x3FUL) << 8) |
-                (((iodc >> 8) & 0x3UL) << 6);
+    sbf[0][2] =
+        (wn & 0x3FFUL) << 20 | (codeL2 & 0x3UL) << 18 | (ura & 0xFUL) << 14 | (svhlth & 0x3FUL) << 8 | (iodc >> 8 & 0x3UL) << 6;
     sbf[0][3] = 0UL;
     sbf[0][4] = 0UL;
     sbf[0][5] = 0UL;
     sbf[0][6] = (tgd & 0xFFUL) << 6;
-    sbf[0][7] = ((iodc & 0xFFUL) << 22) | ((toc & 0xFFFFUL) << 6);
-    sbf[0][8] = ((af2 & 0xFFUL) << 22) | ((af1 & 0xFFFFUL) << 6);
+    sbf[0][7] = (iodc & 0xFFUL) << 22 | (toc & 0xFFFFUL) << 6;
+    sbf[0][8] = (af2 & 0xFFUL) << 22 | (af1 & 0xFFFFUL) << 6;
     sbf[0][9] = (af0 & 0x3FFFFFUL) << 8;
 
     // Subframe 2
     sbf[1][0] = 0x8B0000UL << 6;
     sbf[1][1] = 0x2UL << 8;
-    sbf[1][2] = ((iode & 0xFFUL) << 22) | ((crs & 0xFFFFUL) << 6);
-    sbf[1][3] = ((deltan & 0xFFFFUL) << 14) | (((m0 >> 24) & 0xFFUL) << 6);
+    sbf[1][2] = (iode & 0xFFUL) << 22 | (crs & 0xFFFFUL) << 6;
+    sbf[1][3] = (deltan & 0xFFFFUL) << 14 | (m0 >> 24 & 0xFFUL) << 6;
     sbf[1][4] = (m0 & 0xFFFFFFUL) << 6;
-    sbf[1][5] = ((cuc & 0xFFFFUL) << 14) | (((ecc >> 24) & 0xFFUL) << 6);
+    sbf[1][5] = (cuc & 0xFFFFUL) << 14 | (ecc >> 24 & 0xFFUL) << 6;
     sbf[1][6] = (ecc & 0xFFFFFFUL) << 6;
-    sbf[1][7] = ((cus & 0xFFFFUL) << 14) | (((sqrta >> 24) & 0xFFUL) << 6);
+    sbf[1][7] = (cus & 0xFFFFUL) << 14 | (sqrta >> 24 & 0xFFUL) << 6;
     sbf[1][8] = (sqrta & 0xFFFFFFUL) << 6;
     sbf[1][9] = (toe & 0xFFFFUL) << 14;
 
     // Subframe 3
     sbf[2][0] = 0x8B0000UL << 6;
     sbf[2][1] = 0x3UL << 8;
-    sbf[2][2] = ((cic & 0xFFFFUL) << 14) | (((omg0 >> 24) & 0xFFUL) << 6);
+    sbf[2][2] = (cic & 0xFFFFUL) << 14 | (omg0 >> 24 & 0xFFUL) << 6;
     sbf[2][3] = (omg0 & 0xFFFFFFUL) << 6;
-    sbf[2][4] = ((cis & 0xFFFFUL) << 14) | (((inc0 >> 24) & 0xFFUL) << 6);
+    sbf[2][4] = (cis & 0xFFFFUL) << 14 | (inc0 >> 24 & 0xFFUL) << 6;
     sbf[2][5] = (inc0 & 0xFFFFFFUL) << 6;
-    sbf[2][6] = ((crc & 0xFFFFUL) << 14) | (((aop >> 24) & 0xFFUL) << 6);
+    sbf[2][6] = (crc & 0xFFFFUL) << 14 | (aop >> 24 & 0xFFUL) << 6;
     sbf[2][7] = (aop & 0xFFFFFFUL) << 6;
     sbf[2][8] = (omgdot & 0xFFFFFFUL) << 6;
-    sbf[2][9] = ((iode & 0xFFUL) << 22) | ((idot & 0x3FFFUL) << 8);
+    sbf[2][9] = (iode & 0xFFUL) << 22 | (idot & 0x3FFFUL) << 8;
 
     if (ionoutc.vflg == TRUE) {
         // Subframe 4, page 18
         sbf[3][0] = 0x8B0000UL << 6;
         sbf[3][1] = 0x4UL << 8;
-        sbf[3][2] = (dataId << 28) | (sbf4_page18_svId << 22) | ((alpha0 & 0xFFUL) << 14) | ((alpha1 & 0xFFUL) << 6);
-        sbf[3][3] = ((alpha2 & 0xFFUL) << 22) | ((alpha3 & 0xFFUL) << 14) | ((beta0 & 0xFFUL) << 6);
-        sbf[3][4] = ((beta1 & 0xFFUL) << 22) | ((beta2 & 0xFFUL) << 14) | ((beta3 & 0xFFUL) << 6);
+        sbf[3][2] = dataId << 28 | sbf4_page18_svId << 22 | (alpha0 & 0xFFUL) << 14 | (alpha1 & 0xFFUL) << 6;
+        sbf[3][3] = (alpha2 & 0xFFUL) << 22 | (alpha3 & 0xFFUL) << 14 | (beta0 & 0xFFUL) << 6;
+        sbf[3][4] = (beta1 & 0xFFUL) << 22 | (beta2 & 0xFFUL) << 14 | (beta3 & 0xFFUL) << 6;
         sbf[3][5] = (A1 & 0xFFFFFFUL) << 6;
-        sbf[3][6] = ((A0 >> 8) & 0xFFFFFFUL) << 6;
-        sbf[3][7] = ((A0 & 0xFFUL) << 22) | ((tot & 0xFFUL) << 14) | ((wnt & 0xFFUL) << 6);
-        sbf[3][8] = ((dtls & 0xFFUL) << 22) | ((wnlsf & 0xFFUL) << 14) | ((dn & 0xFFUL) << 6);
+        sbf[3][6] = (A0 >> 8 & 0xFFFFFFUL) << 6;
+        sbf[3][7] = (A0 & 0xFFUL) << 22 | (tot & 0xFFUL) << 14 | (wnt & 0xFFUL) << 6;
+        sbf[3][8] = (dtls & 0xFFUL) << 22 | (wnlsf & 0xFFUL) << 14 | (dn & 0xFFUL) << 6;
         sbf[3][9] = (dtlsf & 0xFFUL) << 22;
 
     } else {
         // Subframe 4, page 25
         sbf[3][0] = 0x8B0000UL << 6;
         sbf[3][1] = 0x4UL << 8;
-        sbf[3][2] = (dataId << 28) | (sbf4_page25_svId << 22);
+        sbf[3][2] = dataId << 28 | sbf4_page25_svId << 22;
         sbf[3][3] = 0UL;
         sbf[3][4] = 0UL;
         sbf[3][5] = 0UL;
@@ -633,7 +634,7 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     // Subframe 5, page 25
     sbf[4][0] = 0x8B0000UL << 6;
     sbf[4][1] = 0x5UL << 8;
-    sbf[4][2] = (dataId << 28) | (sbf5_page25_svId << 22) | ((toa & 0xFFUL) << 14) | ((wna & 0xFFUL) << 6);
+    sbf[4][2] = dataId << 28 | sbf5_page25_svId << 22 | (toa & 0xFFUL) << 14 | (wna & 0xFFUL) << 6;
     sbf[4][3] = 0UL;
     sbf[4][4] = 0UL;
     sbf[4][5] = 0UL;
@@ -655,13 +656,13 @@ unsigned long countBits(unsigned long v) {
     const unsigned long B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF};
 
     c = v;
-    c = ((c >> S[0]) & B[0]) + (c & B[0]);
-    c = ((c >> S[1]) & B[1]) + (c & B[1]);
-    c = ((c >> S[2]) & B[2]) + (c & B[2]);
-    c = ((c >> S[3]) & B[3]) + (c & B[3]);
-    c = ((c >> S[4]) & B[4]) + (c & B[4]);
+    c = (c >> S[0] & B[0]) + (c & B[0]);
+    c = (c >> S[1] & B[1]) + (c & B[1]);
+    c = (c >> S[2] & B[2]) + (c & B[2]);
+    c = (c >> S[3] & B[3]) + (c & B[3]);
+    c = (c >> S[4] & B[4]) + (c & B[4]);
 
-    return (c);
+    return c;
 }
 
 /*! \brief Compute the Checksum for one given word of a subframe
@@ -698,8 +699,8 @@ unsigned long computeChecksum(unsigned long source, int nib) {
 
     unsigned long D;
     unsigned long d   = source & 0x3FFFFFC0UL;
-    unsigned long D29 = (source >> 31) & 0x1UL;
-    unsigned long D30 = (source >> 30) & 0x1UL;
+    unsigned long D29 = source >> 31 & 0x1UL;
+    unsigned long D30 = source >> 30 & 0x1UL;
 
     if (nib) // Non-information bearing bits for word 2 and 10
     {
@@ -708,8 +709,8 @@ unsigned long computeChecksum(unsigned long source, int nib) {
         with zeros in bits 29 and 30.
         */
 
-        if ((D30 + countBits(bmask[4] & d)) % 2) d ^= (0x1UL << 6);
-        if ((D29 + countBits(bmask[5] & d)) % 2) d ^= (0x1UL << 7);
+        if ((D30 + countBits(bmask[4] & d)) % 2) d ^= 0x1UL << 6;
+        if ((D29 + countBits(bmask[5] & d)) % 2) d ^= 0x1UL << 7;
     }
 
     D = d;
@@ -720,12 +721,12 @@ unsigned long computeChecksum(unsigned long source, int nib) {
     D |= ((D29 + countBits(bmask[2] & d)) % 2) << 3;
     D |= ((D30 + countBits(bmask[3] & d)) % 2) << 2;
     D |= ((D30 + countBits(bmask[4] & d)) % 2) << 1;
-    D |= ((D29 + countBits(bmask[5] & d)) % 2);
+    D |= (D29 + countBits(bmask[5] & d)) % 2;
 
     D &= 0x3FFFFFFFUL;
     // D |= (source & 0xC0000000UL); // Add D29* and D30* from source data bits
 
-    return (D);
+    return D;
 }
 
 /*! \brief Replace all 'E' exponential designators to 'D'
@@ -743,7 +744,7 @@ int replaceExpDesignator(char *str, int len) {
         }
     }
 
-    return (n);
+    return n;
 }
 
 double subGpsTime(gpstime_t g1, gpstime_t g0) {
@@ -752,7 +753,7 @@ double subGpsTime(gpstime_t g1, gpstime_t g0) {
     dt = g1.sec - g0.sec;
     dt += static_cast<double>(g1.week - g0.week) * SECONDS_IN_WEEK;
 
-    return (dt);
+    return dt;
 }
 
 gpstime_t incGpsTime(gpstime_t g0, double dt) {
@@ -773,7 +774,7 @@ gpstime_t incGpsTime(gpstime_t g0, double dt) {
         g1.week--;
     }
 
-    return (g1);
+    return g1;
 }
 
 /*! \brief Read Ephemeris data from the RINEX Navigation file */
@@ -796,7 +797,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
     int flags = 0x0;
 
-    if (NULL == (fp = fopen(fname, "rt"))) return (-1);
+    if (NULL == (fp = fopen(fname, "rt"))) return -1;
 
     // Clear valid flag
     for (ieph = 0; ieph < EPHEM_ARRAY_SIZE; ieph++)
@@ -1077,7 +1078,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         tmp[19] = 0;
         replaceExpDesignator(tmp, 19);
         eph[ieph][sv].svhlth = static_cast<int>(atof(tmp));
-        if ((eph[ieph][sv].svhlth > 0) && (eph[ieph][sv].svhlth < 32)) eph[ieph][sv].svhlth += 32; // Set MSB to 1
+        if (eph[ieph][sv].svhlth > 0 && eph[ieph][sv].svhlth < 32) eph[ieph][sv].svhlth += 32; // Set MSB to 1
 
         strncpy(tmp, str + 41, 19);
         tmp[19] = 0;
@@ -1106,21 +1107,21 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
     if (g0.week >= 0) ieph += 1; // Number of sets of ephemerides
 
-    return (ieph);
+    return ieph;
 }
 
 double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, double *azel) {
     double iono_delay = 0.0;
     double E, phi_u, lam_u, F;
 
-    if (ionoutc->enable == FALSE) return (0.0); // No ionospheric delay
+    if (ionoutc->enable == FALSE) return 0.0; // No ionospheric delay
 
     E     = azel[1] / PI;
     phi_u = llh[0] / PI;
     lam_u = llh[1] / PI;
 
     // Obliquity factor
-    F = 1.0 + 16.0 * pow((0.53 - E), 3.0);
+    F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
 
     if (ionoutc->vflg == FALSE)
         iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
@@ -1174,7 +1175,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
             iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
     }
 
-    return (iono_delay);
+    return iono_delay;
 }
 
 /*! \brief Compute range between a satellite and the receiver
@@ -1259,7 +1260,7 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
     chan->f_code = CODE_FREQ + chan->f_carr * CARR_TO_CODE;
 
     // Initial code phase and data bit counters.
-    ms = ((subGpsTime(chan->rho0.g, chan->g0) + 6.0) - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
+    ms = (subGpsTime(chan->rho0.g, chan->g0) + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
 
     ims              = static_cast<int>(ms);
     chan->code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
@@ -1273,7 +1274,7 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
     chan->icode = ims; // 1 code = 1 ms
 
     chan->codeCA  = chan->ca[static_cast<int>(chan->code_phase)] * 2 - 1;
-    chan->dataBit = static_cast<int>((chan->dwrd[chan->iword] >> (29 - chan->ibit)) & 0x1UL) * 2 - 1;
+    chan->dataBit = static_cast<int>(chan->dwrd[chan->iword] >> (29 - chan->ibit) & 0x1UL) * 2 - 1;
 
     // Save current pseudorange
     chan->rho0 = rho1;
@@ -1307,7 +1308,7 @@ int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
 
     fclose(fp);
 
-    return (numd);
+    return numd;
 }
 
 /*! \brief Read the list of user motions from the input file
@@ -1323,7 +1324,7 @@ int readUserMotionLLH(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     double t, llh[3];
     char   str[MAX_CHAR];
 
-    if (NULL == (fp = fopen(filename, "rt"))) return (-1);
+    if (NULL == (fp = fopen(filename, "rt"))) return -1;
 
     for (numd = 0; numd < USER_MOTION_SIZE; numd++) {
         if (fgets(str, MAX_CHAR, fp) == NULL) break;
@@ -1345,7 +1346,7 @@ int readUserMotionLLH(double xyz[USER_MOTION_SIZE][3], const char *filename) {
 
     fclose(fp);
 
-    return (numd);
+    return numd;
 }
 
 int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
@@ -1356,7 +1357,7 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     double llh[3], pos[3];
     char   tmp[8];
 
-    if (NULL == (fp = fopen(filename, "rt"))) return (-1);
+    if (NULL == (fp = fopen(filename, "rt"))) return -1;
 
     while (1) {
         if (fgets(str, MAX_CHAR, fp) == NULL) break;
@@ -1418,7 +1419,7 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
 
     fclose(fp);
 
-    return (numd);
+    return numd;
 }
 
 int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
@@ -1430,8 +1431,8 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     int           nib;
 
     g0.week  = g.week;
-    g0.sec   = static_cast<double>(((unsigned long)(g.sec + 0.5)) / 30UL) * 30.0; // Align with the full frame length = 30 sec
-    chan->g0 = g0;                                                                // Data bit reference time
+    g0.sec   = static_cast<double>((unsigned long)(g.sec + 0.5) / 30UL) * 30.0; // Align with the full frame length = 30 sec
+    chan->g0 = g0;                                                              // Data bit reference time
 
     wn  = static_cast<unsigned long>(g0.week % 1024);
     tow = static_cast<unsigned long>(g0.sec) / 6UL;
@@ -1444,11 +1445,11 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             sbfwrd = chan->sbf[4][iwrd];
 
             // Add TOW-count message into HOW
-            if (iwrd == 1) sbfwrd |= ((tow & 0x1FFFFUL) << 13);
+            if (iwrd == 1) sbfwrd |= (tow & 0x1FFFFUL) << 13;
 
             // Compute checksum
-            sbfwrd |= (prevwrd << 30) & 0xC0000000UL;                // 2 LSBs of the previous transmitted word
-            nib              = ((iwrd == 1) || (iwrd == 9)) ? 1 : 0; // Non-information bearing bits for word 2 and 10
+            sbfwrd |= prevwrd << 30 & 0xC0000000UL;            // 2 LSBs of the previous transmitted word
+            nib              = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
             chan->dwrd[iwrd] = computeChecksum(sbfwrd, nib);
 
             prevwrd = chan->dwrd[iwrd];
@@ -1477,21 +1478,21 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             sbfwrd = chan->sbf[isbf][iwrd];
 
             // Add transmission week number to Subframe 1
-            if ((isbf == 0) && (iwrd == 2)) sbfwrd |= (wn & 0x3FFUL) << 20;
+            if (isbf == 0 && iwrd == 2) sbfwrd |= (wn & 0x3FFUL) << 20;
 
             // Add TOW-count message into HOW
-            if (iwrd == 1) sbfwrd |= ((tow & 0x1FFFFUL) << 13);
+            if (iwrd == 1) sbfwrd |= (tow & 0x1FFFFUL) << 13;
 
             // Compute checksum
-            sbfwrd |= (prevwrd << 30) & 0xC0000000UL;   // 2 LSBs of the previous transmitted word
-            nib = ((iwrd == 1) || (iwrd == 9)) ? 1 : 0; // Non-information bearing bits for word 2 and 10
+            sbfwrd |= prevwrd << 30 & 0xC0000000UL; // 2 LSBs of the previous transmitted word
+            nib = iwrd == 1 || iwrd == 9 ? 1 : 0;   // Non-information bearing bits for word 2 and 10
             chan->dwrd[(isbf + 1) * N_DWRD_SBF + iwrd] = computeChecksum(sbfwrd, nib);
 
             prevwrd = chan->dwrd[(isbf + 1) * N_DWRD_SBF + iwrd];
         }
     }
 
-    return (1);
+    return 1;
 }
 
 int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, double *azel) {
@@ -1499,7 +1500,7 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
     double pos[3], vel[3], clk[3], los[3];
     double tmat[3][3];
 
-    if (eph.vflg != 1) return (-1); // Invalid
+    if (eph.vflg != 1) return -1; // Invalid
 
     xyz2llh(xyz, llh);
     ltcmat(llh, tmat);
@@ -1509,9 +1510,9 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
     ecef2neu(los, tmat, neu);
     neu2azel(azel, neu);
 
-    if (azel[1] * R2D > elvMask) return (1); // Visible
+    if (azel[1] * R2D > elvMask) return 1; // Visible
     // else
-    return (0); // Invisible
+    return 0; // Invisible
 }
 
 int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, double *xyz, double elvMask) {
@@ -1583,7 +1584,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
         }
     }
 
-    return (nsat);
+    return nsat;
 }
 
 void usage(void) {
@@ -1907,7 +1908,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    if ((verb == TRUE) && (ionoutc.vflg == TRUE)) {
+    if (verb == TRUE && ionoutc.vflg == TRUE) {
         fprintf(stderr, "  %12.3e %12.3e %12.3e %12.3e\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
         fprintf(stderr, "  %12.3e %12.3e %12.3e %12.3e\n", ionoutc.beta0, ionoutc.beta1, ionoutc.beta2, ionoutc.beta3);
         fprintf(stderr, "   %19.11e %19.11e  %9d %9d\n", ionoutc.A0, ionoutc.A1, ionoutc.tot, ionoutc.wnt);
@@ -1946,7 +1947,7 @@ int main(int argc, char *argv[]) {
             double     dsec;
 
             gtmp.week = g0.week;
-            gtmp.sec  = static_cast<double>(((int)(g0.sec)) / 7200) * 7200.0;
+            gtmp.sec  = static_cast<double>((int)g0.sec / 7200) * 7200.0;
 
             dsec = subGpsTime(gtmp, gmin);
 
@@ -2168,7 +2169,7 @@ int main(int argc, char *argv[]) {
 #ifdef FLOAT_CARR_PHASE
                     iTable = (int)floor(chan[i].carr_phase * 512.0);
 #else
-                    iTable = (chan[i].carr_phase >> 16) & 0x1ff; // 9-bit index
+                    iTable = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
 #endif
                     ip = chan[i].dataBit * chan[i].codeCA * cosTable512[iTable] * gain[i];
                     qp = chan[i].dataBit * chan[i].codeCA * sinTable512[iTable] * gain[i];
@@ -2202,7 +2203,7 @@ int main(int argc, char *argv[]) {
 
                             // Set new navigation data bit
                             chan[i].dataBit =
-                                static_cast<int>((chan[i].dwrd[chan[i].iword] >> (29 - chan[i].ibit)) & 0x1UL) * 2 - 1;
+                                static_cast<int>(chan[i].dwrd[chan[i].iword] >> (29 - chan[i].ibit) & 0x1UL) * 2 - 1;
                         }
                     }
 
@@ -2327,5 +2328,5 @@ int main(int argc, char *argv[]) {
     // Process time
     fprintf(stderr, "Process time = %.1f [sec]\n", static_cast<double>(tend - tstart) / CLOCKS_PER_SEC);
 
-    return (0);
+    return 0;
 }
