@@ -1378,9 +1378,10 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     unsigned long prevwrd;
     int           nib;
 
-    g0.week  = g.week;
-    g0.sec   = static_cast<double>((unsigned long)(g.sec + 0.5) / 30UL) * 30.0; // Align with the full frame length = 30 sec
-    chan->g0 = g0;                                                              // Data bit reference time
+    g0.week = g.week;
+    g0.sec =
+        static_cast<double>(static_cast<unsigned long>(g.sec + 0.5) / 30UL) * 30.0; // Align with the full frame length = 30 sec
+    chan->g0 = g0;                                                                  // Data bit reference time
 
     unsigned long wn  = static_cast<unsigned long>(g0.week % 1024);
     unsigned long tow = static_cast<unsigned long>(g0.sec) / 6UL;
@@ -1891,7 +1892,7 @@ int main(int argc, char *argv[]) {
             double     dsec;
 
             gtmp.week = g0.week;
-            gtmp.sec  = static_cast<double>((int)g0.sec / 7200) * 7200.0;
+            gtmp.sec  = static_cast<double>(static_cast<int>(g0.sec) / 7200) * 7200.0;
 
             dsec = subGpsTime(gtmp, gmin);
 
@@ -1990,7 +1991,7 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     // Allocate I/Q buffer
-    iq_buff = reinterpret_cast<short *>(calloc(2 * iq_buff_size, 2));
+    iq_buff = static_cast<short *>(calloc(2 * iq_buff_size, 2));
 
     if (iq_buff == nullptr) {
         fprintf(stderr, "ERROR: Failed to allocate 16-bit I/Q buffer.\n");
@@ -1998,13 +1999,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (data_format == SC08) {
-        iq8_buff = reinterpret_cast<signed char *>(calloc(2 * iq_buff_size, 1));
+        iq8_buff = static_cast<signed char *>(calloc(2 * iq_buff_size, 1));
         if (iq8_buff == nullptr) {
             fprintf(stderr, "ERROR: Failed to allocate 8-bit I/Q buffer.\n");
             exit(1);
         }
     } else if (data_format == SC01) {
-        iq8_buff = reinterpret_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
+        iq8_buff = static_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
         if (iq8_buff == nullptr) {
             fprintf(stderr, "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n");
             exit(1);
@@ -2111,7 +2112,7 @@ int main(int argc, char *argv[]) {
             for (i = 0; i < MAX_CHAN; i++) {
                 if (chan[i].prn > 0) {
 #ifdef FLOAT_CARR_PHASE
-                    iTable = (int)floor(chan[i].carr_phase * 512.0);
+                    iTable = static_cast<int>(floor(chan[i].carr_phase * 512.0));
 #else
                     iTable = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
 #endif
