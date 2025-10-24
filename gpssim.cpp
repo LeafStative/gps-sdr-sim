@@ -23,7 +23,7 @@
 namespace ranges = std::ranges;
 
 // clang-format off
-constexpr std::array<int, 512> sinTable512 {
+constexpr std::array<int, 512> SIN_TABLE512 {
        2,   5,   8,  11,  14,  17,  20,  23,  26,  29,  32,  35,  38,  41,  44,  47,
       50,  53,  56,  59,  62,  65,  68,  71,  74,  77,  80,  83,  86,  89,  91,  94,
       97, 100, 103, 105, 108, 111, 114, 116, 119, 122, 125, 127, 130, 132, 135, 138,
@@ -58,7 +58,7 @@ constexpr std::array<int, 512> sinTable512 {
      -47, -44, -41, -38, -35, -32, -29, -26, -23, -20, -17, -14, -11,  -8,  -5,  -2
 };
 
-constexpr std::array<int, 512> cosTable512 = {
+constexpr std::array<int, 512> COS_TABLE512 = {
      250, 250, 250, 250, 250, 249, 249, 249, 249, 248, 248, 248, 247, 247, 246, 245,
      245, 244, 244, 243, 242, 241, 241, 240, 239, 238, 237, 236, 235, 234, 233, 232,
      230, 229, 228, 227, 225, 224, 223, 221, 220, 218, 217, 215, 214, 212, 210, 209,
@@ -94,7 +94,7 @@ constexpr std::array<int, 512> cosTable512 = {
 };
 
 // Receiver antenna attenuation in dB for boresight angle = 0:5:180 [deg]
-constexpr std::array<double, 37> ant_pat_db = {
+constexpr std::array<double, 37> ANT_PAT_DB = {
      0.00,  0.00,  0.22,  0.44,  0.67,  1.11,  1.56,  2.00,  2.44,  2.89,  3.56,  4.22,
      4.89,  5.56,  6.22,  6.89,  7.56,  8.22,  8.89,  9.78, 10.67, 11.56, 12.44, 13.33,
     14.44, 15.56, 16.67, 17.78, 18.89, 20.00, 21.33, 22.67, 24.00, 25.56, 27.33, 29.33,
@@ -146,8 +146,8 @@ void codegen(int *ca, int prn) {
         return;
     }
 
-    int r1[N_DWRD_SBF], r2[N_DWRD_SBF];
-    for (size_t i = 0; i < N_DWRD_SBF; ++i) {
+    int r1[N_DWORD_SBF], r2[N_DWORD_SBF];
+    for (size_t i = 0; i < N_DWORD_SBF; ++i) {
         r1[i] = r2[i] = -1;
     }
 
@@ -440,7 +440,7 @@ void satpos(ephem_t eph, gpstime_t g, double *pos, double *vel, double *clk) {
  *  \param[in] eph Ephemeris of given SV
  *  \param[out] sbf Array of five sub-frames, 10 long words each
  */
-void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_DWRD_SBF]) {
+void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_DWORD_SBF]) {
     // FIXED: This has to be the "transmission" week number, not for the ephemeris reference time
     // wn = (unsigned long)(eph.toe.week%1024);
     constexpr unsigned long wn = 0UL;
@@ -1072,7 +1072,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
         return 0.0;
     }
 
-    const double E     = azel[1] / PI;
+    const double E = azel[1] / PI;
     // Obliquity factor
     const double F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
 
@@ -1087,7 +1087,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
         // Geodetic latitude of the earth projection of the ionospheric intersection point
         // (semi-circles)
         const double phi_u = llh[0] / PI;
-        double phi_i = phi_u + psi * cos(azel[0]);
+        double       phi_i = phi_u + psi * cos(azel[0]);
         if (phi_i > 0.416) {
             phi_i = 0.416;
         } else if (phi_i < -0.416) {
@@ -1398,7 +1398,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     if (init == 1) { // Initialize subframe 5
         prevwrd = 0UL;
 
-        for (size_t iwrd = 0; iwrd < N_DWRD_SBF; iwrd++) {
+        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
             unsigned sbfwrd = chan->sbf[4][iwrd];
 
             // Add TOW-count message into HOW
@@ -1414,8 +1414,8 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             prevwrd = chan->dwrd[iwrd];
         }
     } else { // Save subframe 5
-        for (size_t iwrd = 0; iwrd < N_DWRD_SBF; iwrd++) {
-            chan->dwrd[iwrd] = chan->dwrd[N_DWRD_SBF * N_SBF + iwrd];
+        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
+            chan->dwrd[iwrd] = chan->dwrd[N_DWORD_SBF * N_SBF + iwrd];
 
             prevwrd = chan->dwrd[iwrd];
         }
@@ -1432,7 +1432,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     for (size_t isbf = 0; isbf < N_SBF; isbf++) {
         tow++;
 
-        for (size_t iwrd = 0; iwrd < N_DWRD_SBF; iwrd++) {
+        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
             unsigned sbfwrd = chan->sbf[isbf][iwrd];
 
             // Add transmission week number to Subframe 1
@@ -1444,9 +1444,9 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             // Compute checksum
             sbfwrd |= prevwrd << 30 & 0xC0000000UL;   // 2 LSBs of the previous transmitted word
             int nib = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
-            chan->dwrd[(isbf + 1) * N_DWRD_SBF + iwrd] = computeChecksum(sbfwrd, nib);
+            chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd] = computeChecksum(sbfwrd, nib);
 
-            prevwrd = chan->dwrd[(isbf + 1) * N_DWRD_SBF + iwrd];
+            prevwrd = chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd];
         }
     }
 
@@ -2068,7 +2068,7 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     for (int i = 0; i < 37; i++) {
-        ant_pat[i] = pow(10.0, -ant_pat_db[i] / 20.0);
+        ant_pat[i] = pow(10.0, -ANT_PAT_DB[i] / 20.0);
     }
 
     ////////////////////////////////////////////////////////////
@@ -2127,8 +2127,8 @@ int main(int argc, char *argv[]) {
 #else
                     iTable = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
 #endif
-                    ip = chan[i].dataBit * chan[i].codeCA * cosTable512[iTable] * gain[i];
-                    qp = chan[i].dataBit * chan[i].codeCA * sinTable512[iTable] * gain[i];
+                    ip = chan[i].dataBit * chan[i].codeCA * COS_TABLE512[iTable] * gain[i];
+                    qp = chan[i].dataBit * chan[i].codeCA * SIN_TABLE512[iTable] * gain[i];
 
                     // Accumulate for all visible satellites
                     i_acc += ip;
@@ -2150,7 +2150,7 @@ int main(int argc, char *argv[]) {
                                 chan[i].ibit = 0;
                                 chan[i].iword++;
                                 /*
-                                if (chan[i].iword>=N_DWRD)
+                                if (chan[i].iword>=N_DWORD)
                                         fprintf(stderr, "\nWARNING: Subframe word buffer overflow.\n");
                                 */
                             }

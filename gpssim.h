@@ -31,10 +31,10 @@ constexpr auto STATIC_MAX_DURATION = 86400; // second
 constexpr size_t N_SBF = 5; // 5 subframes per frame
 
 /*! \brief Number of words per subframe */
-constexpr size_t N_DWRD_SBF = 10; // 10 word per subframe
+constexpr size_t N_DWORD_SBF = 10; // 10 word per subframe
 
 /*! \brief Number of words */
-constexpr auto N_DWRD = (N_SBF + 1) * N_DWRD_SBF; // Subframe word buffer size
+constexpr auto N_DWORD = (N_SBF + 1) * N_DWORD_SBF; // Subframe word buffer size
 
 /*! \brief C/A code sequence length */
 constexpr auto CA_SEQ_LEN = 1023;
@@ -171,8 +171,8 @@ struct channel_t {
 #endif
     double        code_phase;         /*< Code phase */
     gpstime_t     g0;                 /*!< GPS time at start */
-    unsigned long sbf[5][N_DWRD_SBF]; /*!< current subframe */
-    unsigned long dwrd[N_DWRD];       /*!< Data words of sub-frame */
+    unsigned long sbf[5][N_DWORD_SBF]; /*!< current subframe */
+    unsigned long dwrd[N_DWORD];       /*!< Data words of sub-frame */
     int           iword;              /*!< initial word */
     int           ibit;               /*!< initial bit */
     int           icode;              /*!< initial code */
