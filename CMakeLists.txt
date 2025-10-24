@@ -21,6 +21,7 @@ find_package(scn CONFIG REQUIRED)
 add_executable(gps-sdr-sim
   src/gpssim.cpp
   $<$<BOOL:${PLATFORM_WINDOWS}>:src/getopt.c>
+  src/vec3.cpp
 )
 include_directories(gps-sdr-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(gps-sdr-sim PRIVATE

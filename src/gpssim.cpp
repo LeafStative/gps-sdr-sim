@@ -24,6 +24,7 @@
 #endif
 
 #include "gpssim.h"
+#include "vec3.h"
 
 namespace ranges = std::ranges;
 
@@ -125,34 +126,6 @@ uint32_t count_bits(const uint32_t v) {
     return count;
 }
 
-/*! \brief Subtract two vectors of double
- *  \param[out] y Result of subtraction
- *  \param[in] x1 Minuend of subtraction
- *  \param[in] x2 Subtrahend of subtraction
- */
-void subVect(double *y, const double *x1, const double *x2) {
-    y[0] = x1[0] - x2[0];
-    y[1] = x1[1] - x2[1];
-    y[2] = x1[2] - x2[2];
-}
-
-/*! \brief Compute Norm of Vector
- *  \param[in] x Input vector
- *  \returns Length (Norm) of the input vector
- */
-double normVect(const double *x) {
-    return std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
-}
-
-/*! \brief Compute dot-product of two vectors
- *  \param[in] x1 First multiplicand
- *  \param[in] x2 Second multiplicand
- *  \returns Dot-product of both multiplicands
- */
-double dotProd(const double *x1, const double *x2) {
-    return x1[0] * x2[0] + x1[1] * x2[1] + x1[2] * x2[2];
-}
-
 /* !\brief generate the C/A code sequence for a given Satellite Vehicle PRN
  *  \param[in] prn PRN number of the Satellite Vehicle
  *  \param[out] ca Caller-allocated integer array of 1023 bytes
@@ -234,14 +207,14 @@ void gps2date(const gpstime_t *g, datetime_t *t) {
  *  \param[in] xyz Input Array of X, Y and Z ECEF coordinates
  *  \param[out] llh Output Array of Latitude, Longitude and Height
  */
-void xyz2llh(const double *xyz, double *llh) {
+void xyz2llh(const vec3 &xyz, double *llh) {
     constexpr double a = WGS84_RADIUS;
     constexpr double e = WGS84_ECCENTRICITY;
 
     constexpr double eps = 1.0e-3;
     constexpr double e2  = e * e;
 
-    if (normVect(xyz) < eps) {
+    if (xyz.length() < eps) {
         // Invalid ECEF vector
         llh[0] = 0.0;
         llh[1] = 0.0;
@@ -250,9 +223,7 @@ void xyz2llh(const double *xyz, double *llh) {
         return;
     }
 
-    const double x = xyz[0];
-    const double y = xyz[1];
-    const double z = xyz[2];
+    const auto [x, y, z] = xyz;
 
     const double rho2 = x * x + y * y;
     double       dz   = e2 * z;
@@ -327,10 +298,10 @@ void ltcmat(const double *llh, double t[3][3]) {
  *  \param[in] t Intermediate matrix computed by \ref ltcmat
  *  \param[out] neu Output position as North-East-Up format
  */
-void ecef2neu(const double *xyz, double t[3][3], double *neu) {
-    neu[0] = t[0][0] * xyz[0] + t[0][1] * xyz[1] + t[0][2] * xyz[2];
-    neu[1] = t[1][0] * xyz[0] + t[1][1] * xyz[1] + t[1][2] * xyz[2];
-    neu[2] = t[2][0] * xyz[0] + t[2][1] * xyz[1] + t[2][2] * xyz[2];
+void ecef2neu(const vec3 &xyz, double t[3][3], double *neu) {
+    neu[0] = t[0][0] * xyz.x + t[0][1] * xyz.y + t[0][2] * xyz.z;
+    neu[1] = t[1][0] * xyz.x + t[1][1] * xyz.y + t[1][2] * xyz.z;
+    neu[2] = t[2][0] * xyz.x + t[2][1] * xyz.y + t[2][2] * xyz.z;
 }
 
 /*! \brief Convert North-East-Up to Azimuth + Elevation
@@ -352,7 +323,7 @@ void neu2azel(double *azel, const double *neu) {
  *  \param[out] vel Computed velocity (vector)
  *  \param[clk] clk Computed clock
  */
-void satpos(ephem_t eph, gpstime_t g, double *pos, double *vel, double *clk) {
+void satpos(ephem_t eph, gpstime_t g, vec3 &pos, vec3 &vel, double *clk) {
     // Computing Satellite Velocity using the Broadcast Ephemeris
     // http://www.ngs.noaa.gov/gps-toolbox/bc_velo.htm
 
@@ -433,15 +404,17 @@ void satpos(ephem_t eph, gpstime_t g, double *pos, double *vel, double *clk) {
     sok = sin(ok);
     cok = cos(ok);
 
-    pos[0] = xpk * cok - ypk * cik * sok;
-    pos[1] = xpk * sok + ypk * cik * cok;
-    pos[2] = ypk * sik;
+    pos = vec3{
+        .x = xpk * cok - ypk * cik * sok, //
+        .y = xpk * sok + ypk * cik * cok,
+        .z = ypk * sik};
 
     tmp = ypkdot * cik - ypk * sik * ikdot;
 
-    vel[0] = -eph.omgkdot * pos[1] + xpkdot * cok - tmp * sok;
-    vel[1] = eph.omgkdot * pos[0] + xpkdot * sok + tmp * cok;
-    vel[2] = ypk * cik * ikdot + ypkdot * sik;
+    vel = vec3{
+        .x = -eph.omgkdot * pos.y + xpkdot * cok - tmp * sok,
+        .y = eph.omgkdot * pos.x + xpkdot * sok + tmp * cok,
+        .z = ypk * cik * ikdot + ypkdot * sik};
 
     // Satellite clock correction
     tk = g.sec - eph.toc.sec;
@@ -1135,37 +1108,35 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
  *  \param[in] g GPS time at time of receiving the signal
  *  \param[in] xyz position of the receiver
  */
-void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, double xyz[]) {
+void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
-    double pos[3], vel[3], clk[2];
+    vec3   pos, vel;
+    double clk[2];
     satpos(eph, g, pos, vel, clk);
 
     // Receiver to satellite vector and light-time.
-    double los[3];
-    subVect(los, pos, xyz);
-    const double tau = normVect(los) / SPEED_OF_LIGHT;
+    auto         los = pos - xyz;
+    const double tau = los.length() / SPEED_OF_LIGHT;
 
     // Extrapolate the satellite position backwards to the transmission time.
-    pos[0] -= vel[0] * tau;
-    pos[1] -= vel[1] * tau;
-    pos[2] -= vel[2] * tau;
+    pos -= vel * tau;
 
     // Earth rotation correction. The change in velocity can be neglected.
-    const double xrot = pos[0] + pos[1] * OMEGA_EARTH * tau;
-    const double yrot = pos[1] - pos[0] * OMEGA_EARTH * tau;
-    pos[0]            = xrot;
-    pos[1]            = yrot;
+    const double x_rot = pos.x + pos.y * OMEGA_EARTH * tau;
+    const double y_rot = pos.y - pos.x * OMEGA_EARTH * tau;
+    pos.x              = x_rot;
+    pos.y              = y_rot;
 
     // New observer to satellite vector and satellite range.
-    subVect(los, pos, xyz);
-    const double range = normVect(los);
+    los                = pos - xyz;
+    const double range = los.length();
     rho->d             = range;
 
     // Pseudorange.
     rho->range = range - SPEED_OF_LIGHT * clk[0];
 
     // Relative velocity of SV and receiver.
-    const double rate = dotProd(vel, los) / range;
+    const double rate = vel * los / range;
 
     // Pseudorange rate.
     rho->rate = rate; // - SPEED_OF_LIGHT*clk[1];
@@ -1443,9 +1414,9 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     return 1;
 }
 
-int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, double *azel) {
+int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask, double *azel) {
     double llh[3], neu[3];
-    double pos[3], vel[3], clk[3], los[3];
+    double clk[3];
     double tmat[3][3];
 
     if (eph.vflg != 1) { // Invalid
@@ -1455,8 +1426,10 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
     xyz2llh(xyz, llh);
     ltcmat(llh, tmat);
 
+    vec3 pos, vel;
     satpos(eph, g, pos, vel, clk);
-    subVect(los, pos, xyz);
+
+    const auto los = pos - xyz;
     ecef2neu(los, tmat, neu);
     neu2azel(azel, neu);
 
@@ -1468,12 +1441,12 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
     return 0; // Invisible
 }
 
-int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, double *xyz, double elvMask) {
+int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, const vec3 &xyz, double elvMask) {
     int    nsat = 0;
     double azel[2];
 
-    range_t rho;
-    double  ref[3] = {0.0};
+    range_t        rho;
+    constexpr vec3 ref{.x = 0.0, .y = 0.0, .z = 0.0};
 
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
         if (checkSatVisibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
@@ -1820,7 +1793,7 @@ int main(int argc, char *argv[]) {
         if (numd > iduration) numd = iduration;
 
         // Set user initial position
-        xyz2llh(xyz[0], llh);
+        xyz2llh(reinterpret_cast<vec3 &>(xyz[0]), llh);
     } else {
         // Static geodetic coordinates input mode: "-l"
         // Added by scateu@gmail.com
@@ -2041,7 +2014,7 @@ int main(int argc, char *argv[]) {
     grx = incGpsTime(g0, 0.0);
 
     // Allocate visible satellites
-    allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
+    allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]), elvmask); // TODO: remove cast
 
     for (int i = 0; i < MAX_CHAN; i++) {
         if (chan[i].prn > 0)
@@ -2080,10 +2053,11 @@ int main(int argc, char *argv[]) {
                 size_t  sv = chan[i].prn - 1;
 
                 // Current pseudorange
-                if (!staticLocationMode)
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[iumd]);
-                else
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[0]);
+                if (!staticLocationMode) {
+                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, reinterpret_cast<vec3 &>(xyz[iumd])); // TODO: remove cast
+                } else {
+                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]));
+                }
 
                 chan[i].azel[0] = rho.azel[0];
                 chan[i].azel[1] = rho.azel[1];
@@ -2230,9 +2204,9 @@ int main(int argc, char *argv[]) {
 
             // Update channel allocation
             if (!staticLocationMode) {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[iumd], elvmask);
+                allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[iumd]), elvmask); // TODO: remove cast
             } else {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
+                allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]), elvmask);
             }
 
             // Show details about simulated channels
