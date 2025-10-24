@@ -8,6 +8,11 @@ struct vec3 {
     double y;
     double z;
 
+    constexpr vec3(const double x, const double y, const double z) : x{x}, y{y}, z{z} {
+    }
+    constexpr vec3() : vec3{0.0, 0.0, 0.0} {
+    }
+
     [[nodiscard]] double length() const noexcept;
 
     vec3 &operator-=(const vec3 &rhs) noexcept;

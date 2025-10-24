@@ -405,16 +405,16 @@ void satpos(ephem_t eph, gpstime_t g, vec3 &pos, vec3 &vel, double *clk) {
     cok = cos(ok);
 
     pos = vec3{
-        .x = xpk * cok - ypk * cik * sok, //
-        .y = xpk * sok + ypk * cik * cok,
-        .z = ypk * sik};
+        xpk * cok - ypk * cik * sok, //
+        xpk * sok + ypk * cik * cok,
+        ypk * sik};
 
     tmp = ypkdot * cik - ypk * sik * ikdot;
 
     vel = vec3{
-        .x = -eph.omgkdot * pos.y + xpkdot * cok - tmp * sok,
-        .y = eph.omgkdot * pos.x + xpkdot * sok + tmp * cok,
-        .z = ypk * cik * ikdot + ypkdot * sik};
+        -eph.omgkdot * pos.y + xpkdot * cok - tmp * sok,
+        eph.omgkdot * pos.x + xpkdot * sok + tmp * cok,
+        ypk * cik * ikdot + ypkdot * sik};
 
     // Satellite clock correction
     tk = g.sec - eph.toc.sec;
@@ -1478,6 +1478,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
                         // Initialize carrier phase
                         double r_xyz = rho.range;
 
+                        constexpr vec3 ref;
                         computeRange(&rho, eph[sv], &ionoutc, grx, ref);
                         double r_ref = rho.range;
 

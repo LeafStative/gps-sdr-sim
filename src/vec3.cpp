@@ -15,10 +15,7 @@ vec3 &vec3::operator-=(const vec3 &rhs) noexcept {
 }
 
 vec3 operator-(const vec3 &lhs, const vec3 &rhs) noexcept {
-    return vec3{
-        .x = lhs.x - rhs.x, //
-        .y = lhs.y - rhs.y,
-        .z = lhs.z - rhs.z};
+    return vec3{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
 }
 
 double operator*(const vec3 &lhs, const vec3 &rhs) noexcept {
@@ -26,10 +23,7 @@ double operator*(const vec3 &lhs, const vec3 &rhs) noexcept {
 }
 
 vec3 operator*(const vec3 &v, const double scalar) noexcept {
-    return vec3{
-        .x = v.x * scalar, //
-        .y = v.y * scalar,
-        .z = v.z * scalar};
+    return vec3{v.x * scalar, v.y * scalar, v.z * scalar};
 }
 
 vec3 operator*(const double scalar, const vec3 &v) noexcept {
