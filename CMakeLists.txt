@@ -16,12 +16,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows)
   set(PLATFORM_WINDOWS ON)
 endif()
 
+find_package(scn CONFIG REQUIRED)
+
 add_executable(gps-sdr-sim
   gpssim.cpp
   $<$<BOOL:${PLATFORM_WINDOWS}>:getopt.c>
 )
 target_link_libraries(gps-sdr-sim PRIVATE
   $<$<NOT:$<BOOL:${PLATFORM_WINDOWS}>>:m>
+  scn::scn
 )
 
 set_property(TARGET gps-sdr-sim PROPERTY CXX_STANDARD 20)
