@@ -110,9 +110,8 @@ constexpr std::array<double, 37> ANT_PAT_DB = {
 
 namespace {
 
-int allocated_sat[MAX_SAT];
-
-double xyz[USER_MOTION_SIZE][3];
+std::array<int, MAX_SAT>           allocated_sat;
+std::array<vec3, USER_MOTION_SIZE> xyz;
 
 /*! \brief Count number of bits set to 1
  *  \param[in] v long word in which bits are counted
@@ -251,7 +250,7 @@ void xyz2llh(const vec3 &xyz, double *llh) {
  *  \param[in] llh Input Array of Latitude, Longitude and Height
  *  \param[out] xyz Output Array of X, Y and Z ECEF coordinates
  */
-void llh2xyz(const double *llh, double *xyz) {
+void llh2xyz(const double *llh, vec3 &xyz) {
     constexpr double a  = WGS84_RADIUS;
     constexpr double e  = WGS84_ECCENTRICITY;
     constexpr double e2 = e * e;
@@ -266,9 +265,11 @@ void llh2xyz(const double *llh, double *xyz) {
     const double nph = n + llh[2];
 
     const double tmp = nph * clat;
-    xyz[0]           = tmp * clon;
-    xyz[1]           = tmp * slon;
-    xyz[2]           = ((1.0 - e2) * n + llh[2]) * slat;
+
+    xyz = vec3{
+        tmp * clon, //
+        tmp * slon,
+        ((1.0 - e2) * n + llh[2]) * slat};
 }
 
 /*! \brief Compute the intermediate matrix for LLH to ECEF
@@ -1198,7 +1199,7 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
  *  \param[in] filename File name of the text input file
  *  \returns Number of user data motion records read, -1 on error
  */
-int read_user_motion(double xyz[USER_MOTION_SIZE][3], const std::string &filename) {
+int read_user_motion(std::array<vec3, USER_MOTION_SIZE> &xyz, const std::string &filename) {
     std::ifstream fs{filename};
     if (!fs.is_open()) {
         return -1;
@@ -1218,9 +1219,7 @@ int read_user_motion(double xyz[USER_MOTION_SIZE][3], const std::string &filenam
         }
         const auto [t, x, y, z] = result->values();
 
-        xyz[num_read][0] = x;
-        xyz[num_read][1] = y;
-        xyz[num_read][2] = z;
+        xyz[num_read] = vec3{x, y, z};
     }
 
     return num_read;
@@ -1233,7 +1232,7 @@ int read_user_motion(double xyz[USER_MOTION_SIZE][3], const std::string &filenam
  *
  * Added by romalvarezllorens@gmail.com
  */
-int readUserMotionLLH(double xyz[USER_MOTION_SIZE][3], const char *filename) {
+int readUserMotionLLH(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
     FILE *fp = fopen(filename, "rt");
     if (fp == nullptr) {
         return -1;
@@ -1268,11 +1267,11 @@ int readUserMotionLLH(double xyz[USER_MOTION_SIZE][3], const char *filename) {
     return numd;
 }
 
-int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
+int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
     FILE  *fp;
     int    numd = 0;
     char   str[MAX_CHAR];
-    double llh[3], pos[3];
+    double llh[3];
     char   tmp[8];
 
     if (nullptr == (fp = fopen(filename, "rt"))) return -1;
@@ -1322,11 +1321,7 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename) {
             llh[2] += atof(token);
 
             // Convert geodetic position into ECEF coordinates
-            llh2xyz(llh, pos);
-
-            xyz[numd][0] = pos[0];
-            xyz[numd][1] = pos[1];
-            xyz[numd][2] = pos[2];
+            llh2xyz(llh, xyz[numd]);
 
             // Update the number of track points
             numd++;
@@ -1442,11 +1437,9 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask
 }
 
 int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, const vec3 &xyz, double elvMask) {
-    int    nsat = 0;
-    double azel[2];
-
-    range_t        rho;
-    constexpr vec3 ref{.x = 0.0, .y = 0.0, .z = 0.0};
+    int     nsat = 0;
+    double  azel[2];
+    range_t rho;
 
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
         if (checkSatVisibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
@@ -1636,7 +1629,7 @@ int main(int argc, char *argv[]) {
         case 'c':
             // Static ECEF coordinates input mode
             staticLocationMode = TRUE;
-            sscanf(optarg, "%lf,%lf,%lf", &xyz[0][0], &xyz[0][1], &xyz[0][2]);
+            sscanf(optarg, "%lf,%lf,%lf", &xyz[0].x, &xyz[0].y, &xyz[0].z);
             break;
         case 'l':
             // Static geodetic coordinates input mode
@@ -1794,7 +1787,7 @@ int main(int argc, char *argv[]) {
         if (numd > iduration) numd = iduration;
 
         // Set user initial position
-        xyz2llh(reinterpret_cast<vec3 &>(xyz[0]), llh);
+        xyz2llh(xyz[0], llh);
     } else {
         // Static geodetic coordinates input mode: "-l"
         // Added by scateu@gmail.com
@@ -1807,7 +1800,7 @@ int main(int argc, char *argv[]) {
         llh2xyz(llh, xyz[0]);
     }
 
-    fprintf(stderr, "xyz = %11.1f, %11.1f, %11.1f\n", xyz[0][0], xyz[0][1], xyz[0][2]);
+    fprintf(stderr, "xyz = %11.1f, %11.1f, %11.1f\n", xyz[0].x, xyz[0].y, xyz[0].z);
     fprintf(stderr, "llh = %11.6f, %11.6f, %11.1f\n", llh[0] * R2D, llh[1] * R2D, llh[2]);
 
     ////////////////////////////////////////////////////////////
@@ -2015,7 +2008,7 @@ int main(int argc, char *argv[]) {
     grx = incGpsTime(g0, 0.0);
 
     // Allocate visible satellites
-    allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]), elvmask); // TODO: remove cast
+    allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
 
     for (int i = 0; i < MAX_CHAN; i++) {
         if (chan[i].prn > 0)
@@ -2055,9 +2048,9 @@ int main(int argc, char *argv[]) {
 
                 // Current pseudorange
                 if (!staticLocationMode) {
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, reinterpret_cast<vec3 &>(xyz[iumd])); // TODO: remove cast
+                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[iumd]);
                 } else {
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]));
+                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[0]);
                 }
 
                 chan[i].azel[0] = rho.azel[0];
@@ -2205,9 +2198,9 @@ int main(int argc, char *argv[]) {
 
             // Update channel allocation
             if (!staticLocationMode) {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[iumd]), elvmask); // TODO: remove cast
+                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[iumd], elvmask);
             } else {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, reinterpret_cast<vec3 &>(xyz[0]), elvmask);
+                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
             }
 
             // Show details about simulated channels
