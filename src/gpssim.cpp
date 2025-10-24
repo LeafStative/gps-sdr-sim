@@ -110,7 +110,7 @@ constexpr std::array<double, 37> ANT_PAT_DB = {
 
 namespace {
 
-int allocatedSat[MAX_SAT];
+int allocated_sat[MAX_SAT];
 
 double xyz[USER_MOTION_SIZE][3];
 
@@ -1452,7 +1452,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
         if (checkSatVisibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
             nsat++; // Number of visible satellites
 
-            if (allocatedSat[sv] == -1) { // Visible but not allocated
+            if (allocated_sat[sv] == -1) { // Visible but not allocated
                 int i;
                 // Allocated new satellite
                 for (i = 0; i < MAX_CHAN; i++) {
@@ -1495,14 +1495,14 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
                 }
 
                 // Set satellite allocation channel
-                if (i < MAX_CHAN) allocatedSat[sv] = i;
+                if (i < MAX_CHAN) allocated_sat[sv] = i;
             }
-        } else if (allocatedSat[sv] >= 0) { // Not visible but allocated
+        } else if (allocated_sat[sv] >= 0) { // Not visible but allocated
             // Clear channel
-            chan[allocatedSat[sv]].prn = 0;
+            chan[allocated_sat[sv]].prn = 0;
 
             // Clear satellite allocation flag
-            allocatedSat[sv] = -1;
+            allocated_sat[sv] = -1;
         }
     }
 
@@ -2007,7 +2007,7 @@ int main(int argc, char *argv[]) {
 
     // Clear satellite allocation flag
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        allocatedSat[sv] = -1;
+        allocated_sat[sv] = -1;
     }
 
     // Initial reception time
