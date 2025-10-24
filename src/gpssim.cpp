@@ -1251,7 +1251,7 @@ int readUserMotionLLH(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filen
         }
 
         if (llh[0] > 90.0 || llh[0] < -90.0 || llh[1] > 180.0 || llh[1] < -180.0) {
-            fprintf(stderr, "ERROR: Invalid file format (time[s], latitude[deg], longitude[deg], height [m].\n");
+            std::cerr << "ERROR: Invalid file format (time[s], latitude[deg], longitude[deg], height [m].\n";
             numd = 0; // Empty user motion
             break;
         }
@@ -1379,7 +1379,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
         // Sanity check
         if (((chan->dwrd[1])&(0x1FFFFUL<<13)) != ((tow&0x1FFFFUL)<<13))
         {
-                fprintf(stderr, "\nWARNING: Invalid TOW in subframe 5.\n");
+                std::cerr << "\nWARNING: Invalid TOW in subframe 5.\n";
                 return(0);
         }
         */
@@ -1604,7 +1604,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 3) {
         usage();
-        exit(1);
+        return 1;
     }
 
     while ((result = getopt(argc, argv, "e:u:x:g:c:l:o:s:b:L:T:t:d:ipv")) != -1) {
@@ -1646,15 +1646,15 @@ int main(int argc, char *argv[]) {
         case 's':
             samp_freq = atof(optarg);
             if (samp_freq < 1.0e6) {
-                fprintf(stderr, "ERROR: Invalid sampling frequency.\n");
-                exit(1);
+                std::cerr << "ERROR: Invalid sampling frequency.\n";
+                return 1;
             }
             break;
         case 'b':
             data_format = atoi(optarg);
             if (data_format != SC01 && data_format != SC08 && data_format != SC16) {
-                fprintf(stderr, "ERROR: Invalid I/Q data format.\n");
-                exit(1);
+                std::cerr << "ERROR: Invalid I/Q data format.\n";
+                return 1;
             }
             break;
         case 'L':
@@ -1662,16 +1662,16 @@ int main(int argc, char *argv[]) {
             ionoutc.leapen = TRUE;
             sscanf(optarg, "%d,%d,%d", &ionoutc.wnlsf, &ionoutc.dn, &ionoutc.dtlsf);
             if (ionoutc.dn < 1 || ionoutc.dn > 7) {
-                fprintf(stderr, "ERROR: Invalid GPS day number");
-                exit(1);
+                std::cerr << "ERROR: Invalid GPS day number\n";
+                return 1;
             }
             if (ionoutc.wnlsf < 0) {
-                fprintf(stderr, "ERROR: Invalid GPS week number");
-                exit(1);
+                std::cerr << "ERROR: Invalid GPS week number\n";
+                return 1;
             }
             if (ionoutc.dtlsf < -128 || ionoutc.dtlsf > 127) {
-                fprintf(stderr, "ERROR: Invalid delta leap second");
-                exit(1);
+                std::cerr << "ERROR: Invalid delta leap second\n";
+                return 1;
             }
             break;
         case 'T':
@@ -1698,8 +1698,8 @@ int main(int argc, char *argv[]) {
             sscanf(optarg, "%d/%d/%d,%d:%d:%lf", &t0.y, &t0.m, &t0.d, &t0.hh, &t0.mm, &t0.sec);
             if (t0.y <= 1980 || t0.m < 1 || t0.m > 12 || t0.d < 1 || t0.d > 31 || t0.hh < 0 || t0.hh > 23 || t0.mm < 0 ||
                 t0.mm > 59 || t0.sec < 0.0 || t0.sec >= 60.0) {
-                fprintf(stderr, "ERROR: Invalid date and time.\n");
-                exit(1);
+                std::cerr << "ERROR: Invalid date and time.\n";
+                return 1;
             }
             t0.sec = floor(t0.sec);
             date2gps(&t0, &g0);
@@ -1714,8 +1714,8 @@ int main(int argc, char *argv[]) {
             if (optind < argc && argv[optind][0] != '-') { // Check if next item is an argument
                 fixed_gain = atoi(argv[optind]);
                 if (fixed_gain < 1 || fixed_gain > 128) {
-                    fprintf(stderr, "ERROR: Fixed gain must be between 1 and 128.\n");
-                    exit(1);
+                    std::cerr << "ERROR: Fixed gain must be between 1 and 128.\n";
+                    return 1;
                 }
                 optind++; // Move past this argument for next iteration
             }
@@ -1727,15 +1727,15 @@ int main(int argc, char *argv[]) {
         case ':':
         case '?':
             usage();
-            exit(1);
+            return 1;
         default:
             break;
         }
     }
 
     if (navfile[0] == 0) {
-        fprintf(stderr, "ERROR: GPS ephemeris file is not specified.\n");
-        exit(1);
+        std::cerr << "ERROR: GPS ephemeris file is not specified.\n";
+        return 1;
     }
 
     if (umfile[0] == 0 && !staticLocationMode) {
@@ -1748,8 +1748,8 @@ int main(int argc, char *argv[]) {
 
     if (duration < 0.0 || (duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !staticLocationMode) ||
         (duration > STATIC_MAX_DURATION && staticLocationMode)) {
-        fprintf(stderr, "ERROR: Invalid duration.\n");
-        exit(1);
+        std::cerr << "ERROR: Invalid duration.\n";
+        return 1;
     }
     iduration = static_cast<int>(duration * 10.0 + 0.5);
 
@@ -1775,23 +1775,25 @@ int main(int argc, char *argv[]) {
         }
 
         if (numd == -1) {
-            fprintf(stderr, "ERROR: Failed to open user motion / NMEA GGA file.\n");
-            exit(1);
+            std::cerr << "ERROR: Failed to open user motion / NMEA GGA file.\n";
+            return 1;
         }
         if (numd == 0) {
-            fprintf(stderr, "ERROR: Failed to read user motion / NMEA GGA data.\n");
-            exit(1);
+            std::cerr << "ERROR: Failed to read user motion / NMEA GGA data.\n";
+            return 1;
         }
 
         // Set simulation duration
-        if (numd > iduration) numd = iduration;
+        if (numd > iduration) {
+            numd = iduration;
+        }
 
         // Set user initial position
         xyz2llh(xyz[0], llh);
     } else {
         // Static geodetic coordinates input mode: "-l"
         // Added by scateu@gmail.com
-        fprintf(stderr, "Using static location mode.\n");
+        std::cerr << "Using static location mode.\n";
 
         // Set simulation duration
         numd = iduration;
@@ -1800,8 +1802,8 @@ int main(int argc, char *argv[]) {
         llh2xyz(llh, xyz[0]);
     }
 
-    fprintf(stderr, "xyz = %11.1f, %11.1f, %11.1f\n", xyz[0].x, xyz[0].y, xyz[0].z);
-    fprintf(stderr, "llh = %11.6f, %11.6f, %11.1f\n", llh[0] * R2D, llh[1] * R2D, llh[2]);
+    std::cerr << std::format("xyz = {:11.1f}, {:11.1f}, {:11.1f}\n", xyz[0].x, xyz[0].y, xyz[0].z);
+    std::cerr << std::format("llh = {:11.6f}, {:11.6f}, {:11.1f}\n", llh[0] * R2D, llh[1] * R2D, llh[2]);
 
     ////////////////////////////////////////////////////////////
     // Read ephemeris
@@ -1810,20 +1812,22 @@ int main(int argc, char *argv[]) {
     int neph = readRinexNavAll(eph, &ionoutc, navfile);
 
     if (neph == 0) {
-        fprintf(stderr, "ERROR: No ephemeris available.\n");
-        exit(1);
+        std::cerr << "ERROR: No ephemeris available.\n";
+        return 1;
     }
 
     if (neph == -1) {
-        fprintf(stderr, "ERROR: ephemeris file not found.\n");
-        exit(1);
+        std::cerr << "ERROR: ephemeris file not found.\n";
+        return 1;
     }
 
     if (verb == TRUE && ionoutc.vflg == TRUE) {
-        fprintf(stderr, "  %12.3e %12.3e %12.3e %12.3e\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
-        fprintf(stderr, "  %12.3e %12.3e %12.3e %12.3e\n", ionoutc.beta0, ionoutc.beta1, ionoutc.beta2, ionoutc.beta3);
-        fprintf(stderr, "   %19.11e %19.11e  %9d %9d\n", ionoutc.A0, ionoutc.A1, ionoutc.tot, ionoutc.wnt);
-        fprintf(stderr, "%6d\n", ionoutc.dtls);
+        std::cerr << std::format(
+            "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
+        std::cerr << std::format(
+            "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.beta0, ionoutc.beta1, ionoutc.beta2, ionoutc.beta3);
+        std::cerr << std::format("   {:19.11e} {:19.11e}  {:9d} {:9d}\n", ionoutc.A0, ionoutc.A1, ionoutc.tot, ionoutc.wnt);
+        std::cerr << std::format("{:6d}\n", ionoutc.dtls);
     }
 
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
@@ -1884,10 +1888,9 @@ int main(int argc, char *argv[]) {
             }
         } else {
             if (subGpsTime(g0, gmin) < 0.0 || subGpsTime(gmax, g0) < 0.0) {
-                fprintf(stderr, "ERROR: Invalid start time.\n");
-                fprintf(
-                    stderr,
-                    "tmin = %4d/%02d/%02d,%02d:%02d:%02.0f (%d:%.0f)\n",
+                std::cerr << "ERROR: Invalid start time.\n";
+                std::cerr << std::format(
+                    "tmin = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
                     tmin.y,
                     tmin.m,
                     tmin.d,
@@ -1896,9 +1899,8 @@ int main(int argc, char *argv[]) {
                     tmin.sec,
                     gmin.week,
                     gmin.sec);
-                fprintf(
-                    stderr,
-                    "tmax = %4d/%02d/%02d,%02d:%02d:%02.0f (%d:%.0f)\n",
+                std::cerr << std::format(
+                    "tmax = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
                     tmax.y,
                     tmax.m,
                     tmax.d,
@@ -1907,7 +1909,7 @@ int main(int argc, char *argv[]) {
                     tmax.sec,
                     gmax.week,
                     gmax.sec);
-                exit(1);
+                return 1;
             }
         }
     } else {
@@ -1915,9 +1917,8 @@ int main(int argc, char *argv[]) {
         t0 = tmin;
     }
 
-    fprintf(
-        stderr,
-        "Start time = %4d/%02d/%02d,%02d:%02d:%02.0f (%d:%.0f)\n",
+    std::cerr << std::format(
+        "Start time = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
         t0.y,
         t0.m,
         t0.d,
@@ -1926,7 +1927,7 @@ int main(int argc, char *argv[]) {
         t0.sec,
         g0.week,
         g0.sec);
-    fprintf(stderr, "Duration = %.1f [sec]\n", static_cast<double>(numd) / 10.0);
+    std::cerr << std::format("Duration = {:.1f} [sec]\n", static_cast<double>(numd) / 10.0);
 
     // Select the current set of ephemerides
     int ieph = -1;
@@ -1948,8 +1949,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (ieph == -1) {
-        fprintf(stderr, "ERROR: No current set of ephemerides has been found.\n");
-        exit(1);
+        std::cerr << "ERROR: No current set of ephemerides has been found.\n";
+        return 1;
     }
 
     ////////////////////////////////////////////////////////////
@@ -1960,21 +1961,21 @@ int main(int argc, char *argv[]) {
     iq_buff = static_cast<short *>(calloc(2 * iq_buff_size, 2));
 
     if (iq_buff == nullptr) {
-        fprintf(stderr, "ERROR: Failed to allocate 16-bit I/Q buffer.\n");
-        exit(1);
+        std::cerr << "ERROR: Failed to allocate 16-bit I/Q buffer.\n";
+        return 1;
     }
 
     if (data_format == SC08) {
         iq8_buff = static_cast<signed char *>(calloc(2 * iq_buff_size, 1));
         if (iq8_buff == nullptr) {
-            fprintf(stderr, "ERROR: Failed to allocate 8-bit I/Q buffer.\n");
-            exit(1);
+            std::cerr << "ERROR: Failed to allocate 8-bit I/Q buffer.\n";
+            return 1;
         }
     } else if (data_format == SC01) {
         iq8_buff = static_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
         if (iq8_buff == nullptr) {
-            fprintf(stderr, "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n");
-            exit(1);
+            std::cerr << "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n";
+            return 1;
         }
     }
 
@@ -1983,8 +1984,8 @@ int main(int argc, char *argv[]) {
     FILE *fp;
     if (strcmp("-", outfile)) {
         if (nullptr == (fp = fopen(outfile, "wb"))) {
-            fprintf(stderr, "ERROR: Failed to open output file.\n");
-            exit(1);
+            std::cerr << "ERROR: Failed to open output file.\n";
+            return 1;
         }
     } else {
         fp = stdout;
@@ -2012,9 +2013,8 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < MAX_CHAN; i++) {
         if (chan[i].prn > 0)
-            fprintf(
-                stderr,
-                "%02d %6.1f %5.1f %11.1f %5.1f\n",
+            std::cerr << std::format(
+                "{:02d} {:6.1f} {:5.1f} {:11.1f} {:5.1f}\n",
                 chan[i].prn,
                 chan[i].azel[0] * R2D,
                 chan[i].azel[1] * R2D,
@@ -2111,7 +2111,7 @@ int main(int argc, char *argv[]) {
                                 chan[i].iword++;
                                 /*
                                 if (chan[i].iword>=N_DWORD)
-                                        fprintf(stderr, "\nWARNING: Subframe word buffer overflow.\n");
+                                        std::cerr << "\nWARNING: Subframe word buffer overflow.\n";
                                 */
                             }
 
@@ -2205,12 +2205,11 @@ int main(int argc, char *argv[]) {
 
             // Show details about simulated channels
             if (verb == TRUE) {
-                fprintf(stderr, "\n");
+                std::cerr << '\n';
                 for (int i = 0; i < MAX_CHAN; i++) {
                     if (chan[i].prn > 0)
-                        fprintf(
-                            stderr,
-                            "%02d %6.1f %5.1f %11.1f %5.1f\n",
+                        std::cerr << std::format(
+                            "{:02d} {:6.1f} {:5.1f} {:11.1f} {:5.1f}\n",
                             chan[i].prn,
                             chan[i].azel[0] * R2D,
                             chan[i].azel[1] * R2D,
@@ -2224,13 +2223,13 @@ int main(int argc, char *argv[]) {
         grx = incGpsTime(grx, 0.1);
 
         // Update time counter
-        fprintf(stderr, "\rTime into run = %4.1f", subGpsTime(grx, g0));
+        std::cerr << std::format("\rTime into run = {:4.1f}", subGpsTime(grx, g0));
         fflush(stdout);
     }
 
     clock_t tend = clock();
 
-    fprintf(stderr, "\nDone!\n");
+    std::cerr << "\nDone!\n";
 
     // Free I/Q buffer
     free(iq_buff);
@@ -2239,7 +2238,7 @@ int main(int argc, char *argv[]) {
     fclose(fp);
 
     // Process time
-    fprintf(stderr, "Process time = %.1f [sec]\n", static_cast<double>(tend - tstart) / CLOCKS_PER_SEC);
+    std::cerr << std::format("Process time = {:.1f} [sec]\n", static_cast<double>(tend - tstart) / CLOCKS_PER_SEC);
 
     return 0;
 }
