@@ -102,6 +102,22 @@ constexpr std::array<double, 37> ANT_PAT_DB = {
 };
 // clang-format on
 
+namespace {
+
+/*! \brief Count number of bits set to 1
+ *  \param[in] v long word in which bits are counted
+ *  \returns Count of bits set to 1
+ */
+uint32_t count_bits(const uint32_t v) {
+    // Algorithm from stackoverflow
+    auto count = v - (v >> 1 & 033333333333) - (v >> 2 & 011111111111);
+    count      = (count + (count >> 3) & 030707070707) % 63;
+
+    return count;
+}
+
+} // namespace
+
 int allocatedSat[MAX_SAT];
 
 double xyz[USER_MOTION_SIZE][3];
@@ -584,36 +600,6 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[4][9] = 0UL;
 }
 
-/*! \brief Count number of bits set to 1
- *  \param[in] v long word in which bits are counted
- *  \returns Count of bits set to 1
- */
-unsigned long countBits(unsigned long v) {
-    constexpr std::array<int, 5>           S = {1, 2, 4, 8, 16};
-    constexpr std::array<unsigned long, 5> B = {0x55555555UL, 0x33333333UL, 0x0F0F0F0FUL, 0x00FF00FFUL, 0x0000FFFFUL};
-
-    unsigned long c = v;
-    c               = (c >> S[0] & B[0]) + (c & B[0]);
-    c               = (c >> S[1] & B[1]) + (c & B[1]);
-    c               = (c >> S[2] & B[2]) + (c & B[2]);
-    c               = (c >> S[3] & B[3]) + (c & B[3]);
-    c               = (c >> S[4] & B[4]) + (c & B[4]);
-
-    return c;
-}
-
-/*! \brief Count number of bits set to 1
- *  \param[in] v long word in which bits are counted
- *  \returns Count of bits set to 1
- */
-uint32_t count_bits(const uint32_t v) {
-    // Algorithm from stackoverflow
-    auto count = v - (v >> 1 & 033333333333) - (v >> 2 & 011111111111);
-    count      = (count + (count >> 3) & 030707070707) % 63;
-
-    return count;
-}
-
 /*! \brief Compute the Checksum for one given word of a subframe
  *  \param[in] source The input data
  *  \param[in] nib Does this word contain non-information-bearing bits?
@@ -656,10 +642,10 @@ unsigned long computeChecksum(unsigned long source, int nib) {
         with zeros in bits 29 and 30.
         */
 
-        if ((D30 + countBits(bmask[4] & d)) % 2) {
+        if ((D30 + count_bits(bmask[4] & d)) % 2) {
             d ^= 0x1UL << 6;
         }
-        if ((D29 + countBits(bmask[5] & d)) % 2) {
+        if ((D29 + count_bits(bmask[5] & d)) % 2) {
             d ^= 0x1UL << 7;
         }
     }
@@ -669,12 +655,12 @@ unsigned long computeChecksum(unsigned long source, int nib) {
         D ^= 0x3FFFFFC0UL;
     }
 
-    D |= ((D29 + countBits(bmask[0] & d)) % 2) << 5;
-    D |= ((D30 + countBits(bmask[1] & d)) % 2) << 4;
-    D |= ((D29 + countBits(bmask[2] & d)) % 2) << 3;
-    D |= ((D30 + countBits(bmask[3] & d)) % 2) << 2;
-    D |= ((D30 + countBits(bmask[4] & d)) % 2) << 1;
-    D |= (D29 + countBits(bmask[5] & d)) % 2;
+    D |= ((D29 + count_bits(bmask[0] & d)) % 2) << 5;
+    D |= ((D30 + count_bits(bmask[1] & d)) % 2) << 4;
+    D |= ((D29 + count_bits(bmask[2] & d)) % 2) << 3;
+    D |= ((D30 + count_bits(bmask[3] & d)) % 2) << 2;
+    D |= ((D30 + count_bits(bmask[4] & d)) % 2) << 1;
+    D |= (D29 + count_bits(bmask[5] & d)) % 2;
 
     D &= 0x3FFFFFFFUL;
     // D |= (source & 0xC0000000UL); // Add D29* and D30* from source data bits
