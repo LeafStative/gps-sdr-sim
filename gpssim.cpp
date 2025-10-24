@@ -104,6 +104,10 @@ constexpr std::array<double, 37> ANT_PAT_DB = {
 
 namespace {
 
+int allocatedSat[MAX_SAT];
+
+double xyz[USER_MOTION_SIZE][3];
+
 /*! \brief Count number of bits set to 1
  *  \param[in] v long word in which bits are counted
  *  \returns Count of bits set to 1
@@ -116,11 +120,12 @@ uint32_t count_bits(const uint32_t v) {
     return count;
 }
 
-} // namespace
-
-int allocatedSat[MAX_SAT];
-
-double xyz[USER_MOTION_SIZE][3];
+/*! \brief Replace all 'E' exponential designators to 'D'
+ *  \param str String in which all occurrences of 'E' are replaced with 'D'
+ */
+void replace_exp_designator(std::string &str) {
+    ranges::replace(str, 'D', 'E');
+}
 
 /*! \brief Subtract two vectors of double
  *  \param[out] y Result of subtraction
@@ -684,13 +689,6 @@ int replaceExpDesignator(char *str, int len) {
     }
 
     return n;
-}
-
-/*! \brief Replace all 'E' exponential designators to 'D'
- *  \param str String in which all occurrences of 'E' are replaced with 'D'
- */
-void replace_exp_designator(std::string &str) {
-    std::ranges::replace(str, 'D', 'E');
 }
 
 double subGpsTime(gpstime_t g1, gpstime_t g0) {
@@ -1556,6 +1554,8 @@ void usage() {
         static_cast<double>(USER_MOTION_SIZE) / 10.0,
         STATIC_MAX_DURATION);
 }
+
+} // namespace
 
 int main(int argc, char *argv[]) {
     ephem_t   eph[EPHEM_ARRAY_SIZE][MAX_SAT];
