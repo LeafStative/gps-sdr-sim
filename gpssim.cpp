@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <iostream>
+#include <format>
 #include <fstream>
 #include <ranges>
 #include <string>
@@ -121,13 +123,6 @@ uint32_t count_bits(const uint32_t v) {
     count      = (count + (count >> 3) & 030707070707) % 63;
 
     return count;
-}
-
-/*! \brief Replace all 'E' exponential designators to 'D'
- *  \param str String in which all occurrences of 'E' are replaced with 'D'
- */
-void replace_exp_designator(std::string &str) {
-    ranges::replace(str, 'D', 'E');
 }
 
 /*! \brief Subtract two vectors of double
@@ -692,6 +687,13 @@ int replaceExpDesignator(char *str, int len) {
     }
 
     return n;
+}
+
+/*! \brief Replace all 'E' exponential designators to 'D'
+ *  \param str String in which all occurrences of 'E' are replaced with 'D'
+ */
+void replace_exp_designator(std::string &str) {
+    ranges::replace(str, 'D', 'E');
 }
 
 double subGpsTime(gpstime_t g1, gpstime_t g0) {
@@ -1534,26 +1536,25 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
 }
 
 void usage() {
-    fprintf(
-        stderr,
+    std::cerr << std::format(
         "Usage: gps-sdr-sim [options]\n"
         "Options:\n"
-        "  -e <gps_nav>     RINEX navigation file for GPS ephemerides (required)\n"
-        "  -u <user_motion> User motion file in ECEF x, y, z format (dynamic mode)\n"
-        "  -x <user_motion> User motion file in lat, lon, height format (dynamic mode)\n"
-        "  -g <nmea_gga>    NMEA GGA stream (dynamic mode)\n"
-        "  -c <location>    ECEF X,Y,Z in meters (static mode) e.g. 3967283.154,1022538.181,4872414.484\n"
-        "  -l <location>    Lat, lon, height (static mode) e.g. 35.681298,139.766247,10.0\n"
+        "  -e <gps_nav>        RINEX navigation file for GPS ephemerides (required)\n"
+        "  -u <user_motion>    User motion file in ECEF x, y, z format (dynamic mode)\n"
+        "  -x <user_motion>    User motion file in lat, lon, height format (dynamic mode)\n"
+        "  -g <nmea_gga>       NMEA GGA stream (dynamic mode)\n"
+        "  -c <location>       ECEF X,Y,Z in meters (static mode) e.g. 3967283.154,1022538.181,4872414.484\n"
+        "  -l <location>       Lat, lon, height (static mode) e.g. 35.681298,139.766247,10.0\n"
         "  -L <wnslf,dn,dtslf> User leap future event in GPS week number, day number, next leap second e.g. 2347,3,19\n"
-        "  -t <date,time>   Scenario start time YYYY/MM/DD,hh:mm:ss\n"
-        "  -T <date,time>   Overwrite TOC and TOE to scenario start time\n"
-        "  -d <duration>    Duration [sec] (dynamic mode max: %.0f, static mode max: %d)\n"
-        "  -o <output>      I/Q sampling data file (default: gpssim.bin)\n"
-        "  -s <frequency>   Sampling frequency [Hz] (default: 2600000)\n"
-        "  -b <iq_bits>     I/Q data format [1/8/16] (default: 16)\n"
-        "  -i               Disable ionospheric delay for spacecraft scenario\n"
-        "  -p [fixed_gain]  Disable path loss and hold power level constant\n"
-        "  -v               Show details about simulated channels\n",
+        "  -t <date,time>      Scenario start time YYYY/MM/DD,hh:mm:ss\n"
+        "  -T <date,time>      Overwrite TOC and TOE to scenario start time\n"
+        "  -d <duration>       Duration [sec] (dynamic mode max: {:.0f}, static mode max: {})\n"
+        "  -o <output>         I/Q sampling data file (default: gpssim.bin)\n"
+        "  -s <frequency>      Sampling frequency [Hz] (default: 2600000)\n"
+        "  -b <iq_bits>        I/Q data format [1/8/16] (default: 16)\n"
+        "  -i                  Disable ionospheric delay for spacecraft scenario\n"
+        "  -p [fixed_gain]     Disable path loss and hold power level constant\n"
+        "  -v                  Show details about simulated channels\n",
         static_cast<double>(USER_MOTION_SIZE) / 10.0,
         STATIC_MAX_DURATION);
 }
