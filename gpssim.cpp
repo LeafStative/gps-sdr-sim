@@ -9,8 +9,11 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <fstream>
 #include <ranges>
 #include <string>
+
+#include <scn/scan.h>
 
 #ifdef _WIN32
 #include "getopt.h"
@@ -1218,35 +1221,35 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
 
 /*! \brief Read the list of user motions from the input file
  *  \param[out] xyz Output array of ECEF vectors for user motion
- *  \param[[in] filename File name of the text input file
+ *  \param[in] filename File name of the text input file
  *  \returns Number of user data motion records read, -1 on error
  */
-int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename) {
-    FILE *fp = fopen(filename, "rt");
-    if (fp == nullptr) {
+int read_user_motion(double xyz[USER_MOTION_SIZE][3], const std::string &filename) {
+    std::ifstream fs{filename};
+    if (!fs.is_open()) {
         return -1;
     }
 
-    int  numd;
-    char str[MAX_CHAR];
-    for (numd = 0; numd < USER_MOTION_SIZE; numd++) {
-        if (fgets(str, MAX_CHAR, fp) == nullptr) {
+    int         num_read;
+    std::string line;
+    for (num_read = 0; num_read < USER_MOTION_SIZE; num_read++) {
+        if (!std::getline(fs, line)) {
             break;
         }
 
-        double t, x, y, z;
-        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &x, &y, &z)) { // Read CSV line
+        // Read CSV line
+        const auto result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
+        if (!result) {
             break;
         }
+        const auto [t, x, y, z] = result->values();
 
-        xyz[numd][0] = x;
-        xyz[numd][1] = y;
-        xyz[numd][2] = z;
+        xyz[num_read][0] = x;
+        xyz[num_read][1] = y;
+        xyz[num_read][2] = z;
     }
 
-    fclose(fp);
-
-    return numd;
+    return num_read;
 }
 
 /*! \brief Read the list of user motions from the input file
@@ -1794,12 +1797,13 @@ int main(int argc, char *argv[]) {
 
     if (!staticLocationMode) {
         // Read user motion file
-        if (nmeaGGA == TRUE)
+        if (nmeaGGA == TRUE) {
             numd = readNmeaGGA(xyz, umfile);
-        else if (umLLH == TRUE)
+        } else if (umLLH == TRUE) {
             numd = readUserMotionLLH(xyz, umfile);
-        else
-            numd = readUserMotion(xyz, umfile);
+        } else {
+            numd = read_user_motion(xyz, umfile);
+        }
 
         if (numd == -1) {
             fprintf(stderr, "ERROR: Failed to open user motion / NMEA GGA file.\n");
