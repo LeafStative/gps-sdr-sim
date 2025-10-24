@@ -613,7 +613,7 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
  *  \param[in] nib Does this word contain non-information-bearing bits?
  *  \returns Computed Checksum
  */
-unsigned long computeChecksum(unsigned long source, int nib) {
+unsigned long compute_checksum(const unsigned long source, const bool nib) {
     /*
     Bits 31 to 30 = 2 LSBs of the previous transmitted word, D29* and D30*
     Bits 29 to  6 = Source data bits, d1, d2, ..., d24
@@ -638,11 +638,11 @@ unsigned long computeChecksum(unsigned long source, int nib) {
     D30    00 1011 0111 1010 1000 1001 1100 0000
     */
 
-    const unsigned long bmask[6] = {0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
+    constexpr std::array<uint32_t, 6> b_mask = {0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
 
     unsigned long       d   = source & 0x3FFFFFC0UL;
-    const unsigned long D29 = source >> 31 & 0x1UL;
-    const unsigned long D30 = source >> 30 & 0x1UL;
+    const unsigned long d29 = source >> 31 & 0x1UL;
+    const unsigned long d30 = source >> 30 & 0x1UL;
 
     if (nib) { // Non-information bearing bits for word 2 and 10
         /*
@@ -650,30 +650,30 @@ unsigned long computeChecksum(unsigned long source, int nib) {
         with zeros in bits 29 and 30.
         */
 
-        if ((D30 + count_bits(bmask[4] & d)) % 2) {
+        if ((d30 + count_bits(b_mask[4] & d)) % 2) {
             d ^= 0x1UL << 6;
         }
-        if ((D29 + count_bits(bmask[5] & d)) % 2) {
+        if ((d29 + count_bits(b_mask[5] & d)) % 2) {
             d ^= 0x1UL << 7;
         }
     }
 
-    unsigned long D = d;
-    if (D30) {
-        D ^= 0x3FFFFFC0UL;
+    unsigned long result = d;
+    if (d30) {
+        result ^= 0x3FFFFFC0UL;
     }
 
-    D |= ((D29 + count_bits(bmask[0] & d)) % 2) << 5;
-    D |= ((D30 + count_bits(bmask[1] & d)) % 2) << 4;
-    D |= ((D29 + count_bits(bmask[2] & d)) % 2) << 3;
-    D |= ((D30 + count_bits(bmask[3] & d)) % 2) << 2;
-    D |= ((D30 + count_bits(bmask[4] & d)) % 2) << 1;
-    D |= (D29 + count_bits(bmask[5] & d)) % 2;
+    result |= ((d29 + count_bits(b_mask[0] & d)) % 2) << 5;
+    result |= ((d30 + count_bits(b_mask[1] & d)) % 2) << 4;
+    result |= ((d29 + count_bits(b_mask[2] & d)) % 2) << 3;
+    result |= ((d30 + count_bits(b_mask[3] & d)) % 2) << 2;
+    result |= ((d30 + count_bits(b_mask[4] & d)) % 2) << 1;
+    result |= (d29 + count_bits(b_mask[5] & d)) % 2;
 
-    D &= 0x3FFFFFFFUL;
+    result &= 0x3FFFFFFFUL;
     // D |= (source & 0xC0000000UL); // Add D29* and D30* from source data bits
 
-    return D;
+    return result;
 }
 
 /*! \brief Replace all 'E' exponential designators to 'D'
@@ -1396,7 +1396,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             // Compute checksum
             sbfwrd |= prevwrd << 30 & 0xC0000000UL;            // 2 LSBs of the previous transmitted word
             int nib          = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
-            chan->dwrd[iwrd] = computeChecksum(sbfwrd, nib);
+            chan->dwrd[iwrd] = compute_checksum(sbfwrd, nib);
 
             prevwrd = chan->dwrd[iwrd];
         }
@@ -1431,7 +1431,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
             // Compute checksum
             sbfwrd |= prevwrd << 30 & 0xC0000000UL;   // 2 LSBs of the previous transmitted word
             int nib = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
-            chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd] = computeChecksum(sbfwrd, nib);
+            chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd] = compute_checksum(sbfwrd, nib);
 
             prevwrd = chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd];
         }
