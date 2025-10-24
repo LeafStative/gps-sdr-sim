@@ -19,9 +19,10 @@ endif()
 find_package(scn CONFIG REQUIRED)
 
 add_executable(gps-sdr-sim
-  gpssim.cpp
-  $<$<BOOL:${PLATFORM_WINDOWS}>:getopt.c>
+  src/gpssim.cpp
+  $<$<BOOL:${PLATFORM_WINDOWS}>:src/getopt.c>
 )
+include_directories(gps-sdr-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(gps-sdr-sim PRIVATE
   $<$<NOT:$<BOOL:${PLATFORM_WINDOWS}>>:m>
   scn::scn

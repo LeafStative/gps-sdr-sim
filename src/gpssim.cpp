@@ -9,9 +9,9 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
-#include <iostream>
 #include <format>
 #include <fstream>
+#include <iostream>
 #include <ranges>
 #include <string>
 
@@ -633,7 +633,8 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
     D30    00 1011 0111 1010 1000 1001 1100 0000
     */
 
-    constexpr std::array<uint32_t, 6> b_mask = {0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
+    constexpr std::array<uint32_t, 6> b_mask = {
+        0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
 
     unsigned long       d   = source & 0x3FFFFFC0UL;
     const unsigned long d29 = source >> 31 & 0x1UL;
