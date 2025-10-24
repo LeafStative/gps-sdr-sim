@@ -1661,7 +1661,7 @@ int main(int argc, char *argv[]) {
             // enable custom Leap Event
             ionoutc.leapen = TRUE;
             sscanf(optarg, "%d,%d,%d", &ionoutc.wnlsf, &ionoutc.dn, &ionoutc.dtlsf);
-            if (ionoutc.dn < 1 && ionoutc.dn > 7) {
+            if (ionoutc.dn < 1 || ionoutc.dn > 7) {
                 fprintf(stderr, "ERROR: Invalid GPS day number");
                 exit(1);
             }
@@ -1669,7 +1669,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "ERROR: Invalid GPS week number");
                 exit(1);
             }
-            if (ionoutc.dtlsf < -128 && ionoutc.dtlsf > 127) {
+            if (ionoutc.dtlsf < -128 || ionoutc.dtlsf > 127) {
                 fprintf(stderr, "ERROR: Invalid delta leap second");
                 exit(1);
             }
