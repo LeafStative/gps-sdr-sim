@@ -129,7 +129,7 @@ uint32_t count_bits(const uint32_t v) {
  *  \param[in] prn PRN number of the Satellite Vehicle
  *  \param[out] ca Caller-allocated integer array of 1023 bytes
  */
-void codegen(int *ca, int prn) {
+void codegen(int *ca, const int prn) {
     constexpr std::array<int, 32> delay = {5,   6,   7,   8,   17,  18,  139, 140, 141, 251, 252, 254, 255, 256, 257, 258,
                                            469, 470, 471, 472, 473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862};
 
@@ -319,7 +319,7 @@ void neu2azel(double *azel, const double *neu) {
  *  \param[in] g GPS time at which position is to be computed
  *  \param[out] pos Computed position (vector)
  *  \param[out] vel Computed velocity (vector)
- *  \param[clk] clk Computed clock
+ *  \param[out] clk Computed clock
  */
 void satpos(ephem_t eph, gpstime_t g, vec3 &pos, vec3 &vel, double *clk) {
     // Computing Satellite Velocity using the Broadcast Ephemeris
@@ -479,7 +479,7 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     const signed long   beta3  = static_cast<signed long>(round(ionoutc.beta3 / 65536.0));
     const signed long   A0     = static_cast<signed long>(round(ionoutc.A0 / POW2_M30));
     const signed long   A1     = static_cast<signed long>(round(ionoutc.A1 / POW2_M50));
-    const signed long   dtls   = static_cast<signed long>(ionoutc.dtls);
+    const signed long   dtls   = ionoutc.dtls;
     const unsigned long tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
     const unsigned long wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
 
@@ -648,7 +648,7 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
  *  \param len Length of input string in bytes
  *  \returns Number of characters replaced
  */
-int replaceExpDesignator(char *str, int len) {
+int replaceExpDesignator(char *str, const int len) {
     int n = 0;
 
     for (int i = 0; i < len; i++) {
@@ -668,14 +668,14 @@ void replace_exp_designator(std::string &str) {
     ranges::replace(str, 'D', 'E');
 }
 
-double subGpsTime(gpstime_t g1, gpstime_t g0) {
+double subGpsTime(const gpstime_t g1, const gpstime_t g0) {
     double dt = g1.sec - g0.sec;
     dt += static_cast<double>(g1.week - g0.week) * SECONDS_IN_WEEK;
 
     return dt;
 }
 
-gpstime_t incGpsTime(gpstime_t g0, double dt) {
+gpstime_t incGpsTime(const gpstime_t g0, const double dt) {
     gpstime_t g1;
 
     g1.week = g0.week;
@@ -1027,7 +1027,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     return ieph;
 }
 
-double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, const vec3 &llh, double *azel) {
+double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 &llh, double *azel) {
 
     if (ionoutc->enable == FALSE) { // No ionospheric delay
         return 0.0;
@@ -1106,7 +1106,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, const vec3 &llh, 
  *  \param[in] g GPS time at time of receiving the signal
  *  \param[in] xyz position of the receiver
  */
-void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, const vec3 &xyz) {
+void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
     vec3   pos, vel;
     double clk[2];
@@ -1161,7 +1161,7 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, co
  *  \param[in] rho1 Current range, after \a dt has expired
  *  \param[in dt delta-t (time difference) in seconds
  */
-void computeCodePhase(channel_t *chan, range_t rho1, double dt) {
+void computeCodePhase(channel_t *chan, range_t rho1, const double dt) {
 
     // Pseudorange rate.
     const double rhorate = (rho1.range - chan->rho0.range) / dt;
@@ -1333,7 +1333,7 @@ int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
     return numd;
 }
 
-int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
+int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
     // int           iwrd;
     // unsigned      sbfwrd;
     // unsigned long prevwrd;
@@ -1407,7 +1407,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
     return 1;
 }
 
-int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask, double *azel) {
+int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
     double neu[3];
     double clk[3];
     double tmat[3][3];
@@ -1434,7 +1434,7 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask
     return 0; // Invisible
 }
 
-int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, const vec3 &xyz, double elvMask) {
+int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, const gpstime_t grx, const vec3 &xyz, double elvMask) {
     int     nsat = 0;
     double  azel[2];
     range_t rho;
