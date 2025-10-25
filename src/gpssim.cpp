@@ -203,10 +203,10 @@ void gps2date(const gpstime_t *g, datetime_t *t) {
 }
 
 /*! \brief Convert Earth-centered Earth-fixed (ECEF) into Lat/Long/Height
- *  \param[in] xyz Input Array of X, Y and Z ECEF coordinates
- *  \param[out] llh Output Array of Latitude, Longitude and Height
+ *  \param[in] xyz Input vector of X, Y and Z ECEF coordinates
+ *  \return Output vector of Latitude, Longitude and Height
  */
-void xyz2llh(const vec3 &xyz, double *llh) {
+vec3 xyz2llh(const vec3 &xyz) {
     constexpr double a = WGS84_RADIUS;
     constexpr double e = WGS84_ECCENTRICITY;
 
@@ -215,14 +215,10 @@ void xyz2llh(const vec3 &xyz, double *llh) {
 
     if (xyz.length() < eps) {
         // Invalid ECEF vector
-        llh[0] = 0.0;
-        llh[1] = 0.0;
-        llh[2] = -a;
-
-        return;
+        return vec3{0.0, 0.0, -a};
     }
 
-    const auto [x, y, z] = xyz;
+    const auto &[x, y, z] = xyz;
 
     const double rho2 = x * x + y * y;
     double       dz   = e2 * z;
@@ -241,57 +237,58 @@ void xyz2llh(const vec3 &xyz, double *llh) {
         dz = dz_new;
     }
 
-    llh[0] = atan2(zdz, sqrt(rho2));
-    llh[1] = atan2(y, x);
-    llh[2] = nh - n;
+    return vec3{
+        atan2(zdz, sqrt(rho2)), //
+        atan2(y, x),
+        nh - n};
 }
 
 /*! \brief Convert Lat/Long/Height into Earth-centered Earth-fixed (ECEF)
- *  \param[in] llh Input Array of Latitude, Longitude and Height
- *  \param[out] xyz Output Array of X, Y and Z ECEF coordinates
+ *  \param[in] llh Input vector of Latitude, Longitude and Height
+ *  \return Output vector of X, Y and Z ECEF coordinates
  */
-void llh2xyz(const double *llh, vec3 &xyz) {
+vec3 llh2xyz(const vec3 &llh) {
     constexpr double a  = WGS84_RADIUS;
     constexpr double e  = WGS84_ECCENTRICITY;
     constexpr double e2 = e * e;
 
-    const double clat = cos(llh[0]);
-    const double slat = sin(llh[0]);
-    const double clon = cos(llh[1]);
-    const double slon = sin(llh[1]);
-    const double d    = e * slat;
+    const double c_lat = cos(llh.x);
+    const double s_lat = sin(llh.x);
+    const double c_lon = cos(llh.y);
+    const double s_lon = sin(llh.y);
+    const double d     = e * s_lat;
 
     const double n   = a / sqrt(1.0 - d * d);
-    const double nph = n + llh[2];
+    const double nph = n + llh.z;
 
-    const double tmp = nph * clat;
+    const double tmp = nph * c_lat;
 
-    xyz = vec3{
-        tmp * clon, //
-        tmp * slon,
-        ((1.0 - e2) * n + llh[2]) * slat};
+    return vec3{
+        tmp * c_lon, //
+        tmp * s_lon,
+        ((1.0 - e2) * n + llh.z) * s_lat};
 }
 
 /*! \brief Compute the intermediate matrix for LLH to ECEF
  *  \param[in] llh Input position in Latitude-Longitude-Height format
  *  \param[out] t Three-by-Three output matrix
  */
-void ltcmat(const double *llh, double t[3][3]) {
+void ltcmat(const vec3 &llh, double t[3][3]) {
 
-    const double slat = sin(llh[0]);
-    const double clat = cos(llh[0]);
-    const double slon = sin(llh[1]);
-    const double clon = cos(llh[1]);
+    const double s_lat = sin(llh.x);
+    const double c_lat = cos(llh.x);
+    const double s_lon = sin(llh.y);
+    const double c_lon = cos(llh.y);
 
-    t[0][0] = -slat * clon;
-    t[0][1] = -slat * slon;
-    t[0][2] = clat;
-    t[1][0] = -slon;
-    t[1][1] = clon;
+    t[0][0] = -s_lat * c_lon;
+    t[0][1] = -s_lat * s_lon;
+    t[0][2] = c_lat;
+    t[1][0] = -s_lon;
+    t[1][1] = c_lon;
     t[1][2] = 0.0;
-    t[2][0] = clat * clon;
-    t[2][1] = clat * slon;
-    t[2][2] = slat;
+    t[2][0] = c_lat * c_lon;
+    t[2][1] = c_lat * s_lon;
+    t[2][2] = s_lat;
 }
 
 /*! \brief Convert Earth-centered Earth-Fixed to ?
@@ -1030,7 +1027,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     return ieph;
 }
 
-double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, double *azel) {
+double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, const vec3 &llh, double *azel) {
 
     if (ionoutc->enable == FALSE) { // No ionospheric delay
         return 0.0;
@@ -1050,7 +1047,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
 
         // Geodetic latitude of the earth projection of the ionospheric intersection point
         // (semi-circles)
-        const double phi_u = llh[0] / PI;
+        const double phi_u = llh.x / PI;
         double       phi_i = phi_u + psi * cos(azel[0]);
         if (phi_i > 0.416) {
             phi_i = 0.416;
@@ -1060,7 +1057,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, doub
 
         // Geodetic longitude of the earth projection of the ionospheric intersection point
         // (semi-circles)
-        const double lam_u = llh[1] / PI;
+        const double lam_u = llh.y / PI;
         const double lam_i = lam_u + psi * sin(azel[0]) / cos(phi_i * PI);
 
         // Geomagnetic latitude of the earth projection of the ionospheric intersection
@@ -1146,8 +1143,8 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, co
     rho->g = g;
 
     // Azimuth and elevation angles.
-    double llh[3], neu[3];
-    xyz2llh(xyz, llh);
+    double neu[3];
+    const auto llh = xyz2llh(xyz);
 
     double tmat[3][3];
     ltcmat(llh, tmat);
@@ -1245,21 +1242,22 @@ int readUserMotionLLH(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filen
             break;
         }
 
-        double t, llh[3];
-        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &llh[0], &llh[1], &llh[2])) { // Read CSV line
+        double t;
+        vec3   llh;
+        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &llh.x, &llh.y, &llh.z)) { // Read CSV line
             break;
         }
 
-        if (llh[0] > 90.0 || llh[0] < -90.0 || llh[1] > 180.0 || llh[1] < -180.0) {
+        if (llh.x > 90.0 || llh.x < -90.0 || llh.y > 180.0 || llh.y < -180.0) {
             std::cerr << "ERROR: Invalid file format (time[s], latitude[deg], longitude[deg], height [m].\n";
             numd = 0; // Empty user motion
             break;
         }
 
-        llh[0] /= R2D; // convert to RAD
-        llh[1] /= R2D; // convert to RAD
+        llh.x /= R2D; // convert to RAD
+        llh.y /= R2D; // convert to RAD
 
-        llh2xyz(llh, xyz[numd]);
+        xyz[numd] = llh2xyz(llh);
     }
 
     fclose(fp);
@@ -1268,11 +1266,11 @@ int readUserMotionLLH(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filen
 }
 
 int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
-    FILE  *fp;
-    int    numd = 0;
-    char   str[MAX_CHAR];
-    double llh[3];
-    char   tmp[8];
+    FILE *fp;
+    int   numd = 0;
+    char  str[MAX_CHAR];
+    vec3  llh;
+    char  tmp[8];
 
     if (nullptr == (fp = fopen(filename, "rt"))) return -1;
 
@@ -1288,23 +1286,23 @@ int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
             strncpy(tmp, token, 2);
             tmp[2] = 0;
 
-            llh[0] = atof(tmp) + atof(token + 2) / 60.0;
+            llh.x = atof(tmp) + atof(token + 2) / 60.0;
 
             token = strtok(nullptr, ","); // North or south
-            if (token[0] == 'S') llh[0] *= -1.0;
+            if (token[0] == 'S') llh.x *= -1.0;
 
-            llh[0] /= R2D; // in radian
+            llh.x /= R2D; // in radian
 
             token = strtok(nullptr, ","); // Longitude
             strncpy(tmp, token, 3);
             tmp[3] = 0;
 
-            llh[1] = atof(tmp) + atof(token + 3) / 60.0;
+            llh.y = atof(tmp) + atof(token + 3) / 60.0;
 
             token = strtok(nullptr, ","); // East or west
-            if (token[0] == 'W') llh[1] *= -1.0;
+            if (token[0] == 'W') llh.y *= -1.0;
 
-            llh[1] /= R2D; // in radian
+            llh.y /= R2D; // in radian
 
             token = strtok(nullptr, ","); // GPS fix
             token = strtok(nullptr, ","); // Number of satellites
@@ -1312,16 +1310,16 @@ int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
 
             token = strtok(nullptr, ","); // Altitude above meas sea level
 
-            llh[2] = atof(token);
+            llh.z = atof(token);
 
             token = strtok(nullptr, ","); // in meter
 
             token = strtok(nullptr, ","); // Geoid height above WGS84 ellipsoid
 
-            llh[2] += atof(token);
+            llh.z += atof(token);
 
             // Convert geodetic position into ECEF coordinates
-            llh2xyz(llh, xyz[numd]);
+            xyz[numd] = llh2xyz(llh);
 
             // Update the number of track points
             numd++;
@@ -1410,7 +1408,7 @@ int generateNavMsg(gpstime_t g, channel_t *chan, int init) {
 }
 
 int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask, double *azel) {
-    double llh[3], neu[3];
+    double neu[3];
     double clk[3];
     double tmat[3][3];
 
@@ -1418,7 +1416,7 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, const vec3 &xyz, double elvMask
         return -1;
     }
 
-    xyz2llh(xyz, llh);
+    const auto llh = xyz2llh(xyz);
     ltcmat(llh, tmat);
 
     vec3 pos, vel;
@@ -1533,7 +1531,7 @@ int main(int argc, char *argv[]) {
     ephem_t   eph[EPHEM_ARRAY_SIZE][MAX_SAT];
     gpstime_t g0;
 
-    double llh[3];
+    vec3 llh;
 
     channel_t chan[MAX_CHAN];
     double    elvmask = 0.0; // in degree
@@ -1635,10 +1633,10 @@ int main(int argc, char *argv[]) {
             // Static geodetic coordinates input mode
             // Added by scateu@gmail.com
             staticLocationMode = TRUE;
-            sscanf(optarg, "%lf,%lf,%lf", &llh[0], &llh[1], &llh[2]);
-            llh[0] = llh[0] / R2D; // convert to RAD
-            llh[1] = llh[1] / R2D; // convert to RAD
-            llh2xyz(llh, xyz[0]);  // Convert llh to xyz
+            sscanf(optarg, "%lf,%lf,%lf", &llh.x, &llh.y, &llh.z);
+            llh.x /= R2D;          // convert to RAD
+            llh.y /= R2D;          // convert to RAD
+            xyz[0] = llh2xyz(llh); // Convert llh to xyz
             break;
         case 'o':
             strcpy(outfile, optarg);
@@ -1741,9 +1739,9 @@ int main(int argc, char *argv[]) {
     if (umfile[0] == 0 && !staticLocationMode) {
         // Default static location; Tokyo
         staticLocationMode = TRUE;
-        llh[0]             = 35.681298 / R2D;
-        llh[1]             = 139.766247 / R2D;
-        llh[2]             = 10.0;
+        llh.x              = 35.681298 / R2D;
+        llh.y              = 139.766247 / R2D;
+        llh.z              = 10.0;
     }
 
     if (duration < 0.0 || (duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !staticLocationMode) ||
@@ -1789,7 +1787,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Set user initial position
-        xyz2llh(xyz[0], llh);
+        llh = xyz2llh(xyz[0]);
     } else {
         // Static geodetic coordinates input mode: "-l"
         // Added by scateu@gmail.com
@@ -1799,11 +1797,11 @@ int main(int argc, char *argv[]) {
         numd = iduration;
 
         // Set user initial position
-        llh2xyz(llh, xyz[0]);
+        xyz[0] = llh2xyz(llh);
     }
 
     std::cerr << std::format("xyz = {:11.1f}, {:11.1f}, {:11.1f}\n", xyz[0].x, xyz[0].y, xyz[0].z);
-    std::cerr << std::format("llh = {:11.6f}, {:11.6f}, {:11.1f}\n", llh[0] * R2D, llh[1] * R2D, llh[2]);
+    std::cerr << std::format("llh = {:11.6f}, {:11.6f}, {:11.1f}\n", llh.x * R2D, llh.y * R2D, llh.z);
 
     ////////////////////////////////////////////////////////////
     // Read ephemeris
