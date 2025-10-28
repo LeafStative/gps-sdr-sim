@@ -64,7 +64,7 @@ constexpr std::array<int, 512> SIN_TABLE512 {
      -47, -44, -41, -38, -35, -32, -29, -26, -23, -20, -17, -14, -11,  -8,  -5,  -2
 };
 
-constexpr std::array<int, 512> COS_TABLE512 = {
+constexpr std::array<int, 512> COS_TABLE512 {
      250, 250, 250, 250, 250, 249, 249, 249, 249, 248, 248, 248, 247, 247, 246, 245,
      245, 244, 244, 243, 242, 241, 241, 240, 239, 238, 237, 236, 235, 234, 233, 232,
      230, 229, 228, 227, 225, 224, 223, 221, 220, 218, 217, 215, 214, 212, 210, 209,
@@ -100,7 +100,7 @@ constexpr std::array<int, 512> COS_TABLE512 = {
 };
 
 // Receiver antenna attenuation in dB for boresight angle = 0:5:180 [deg]
-constexpr std::array<double, 37> ANT_PAT_DB = {
+constexpr std::array<double, 37> ANT_PAT_DB {
      0.00,  0.00,  0.22,  0.44,  0.67,  1.11,  1.56,  2.00,  2.44,  2.89,  3.56,  4.22,
      4.89,  5.56,  6.22,  6.89,  7.56,  8.22,  8.89,  9.78, 10.67, 11.56, 12.44, 13.33,
     14.44, 15.56, 16.67, 17.78, 18.89, 20.00, 21.33, 22.67, 24.00, 25.56, 27.33, 29.33,
@@ -130,7 +130,7 @@ uint32_t count_bits(const uint32_t v) {
  *  \param[out] ca Caller-allocated integer array of 1023 bytes
  */
 void codegen(int *ca, const int prn) {
-    constexpr std::array<int, 32> delay = {5,   6,   7,   8,   17,  18,  139, 140, 141, 251, 252, 254, 255, 256, 257, 258,
+    constexpr std::array<size_t, 32> delay{5,   6,   7,   8,   17,  18,  139, 140, 141, 251, 252, 254, 255, 256, 257, 258,
                                            469, 470, 471, 472, 473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862};
 
     if (prn < 1 || prn > 32) {
@@ -144,13 +144,13 @@ void codegen(int *ca, const int prn) {
 
     int g1[CA_SEQ_LEN], g2[CA_SEQ_LEN];
     for (size_t i = 0; i < CA_SEQ_LEN; ++i) {
-        g1[i] = r1[9];
-        g2[i] = r2[9];
+        g1[i] = r1[N_DWORD_SBF - 1];
+        g2[i] = r2[N_DWORD_SBF - 1];
 
-        const int c1 = r1[2] * r1[9];
-        const int c2 = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[9];
+        const int c1 = r1[2] * r1[N_DWORD_SBF - 1];
+        const int c2 = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[N_DWORD_SBF - 1];
 
-        for (int j = 9; j > 0; --j) {
+        for (int j = N_DWORD_SBF - 1; j > 0; --j) {
             r1[j] = r1[j - 1];
             r2[j] = r2[j - 1];
         }
@@ -158,7 +158,7 @@ void codegen(int *ca, const int prn) {
         r2[0] = c2;
     }
 
-    for (int i = 0, j = CA_SEQ_LEN - delay[prn - 1]; i < CA_SEQ_LEN; ++i, ++j) {
+    for (size_t i = 0, j = CA_SEQ_LEN - delay[prn - 1]; i < CA_SEQ_LEN; ++i, ++j) {
         ca[i] = (1 - g1[i] * g2[j % CA_SEQ_LEN]) / 2;
     }
 }
@@ -168,18 +168,18 @@ void codegen(int *ca, const int prn) {
  *  \param[out] g output date in GPS form
  */
 void date2gps(const datetime_t *t, gpstime_t *g) {
-    constexpr std::array<int, 12> doy = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    constexpr std::array<int, 12> doy{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
     const int ye = t->y - 1980;
 
     // Compute the number of leap days since Jan 5/Jan 6, 1980.
-    int lpdays = ye / 4 + 1;
+    int leap_days = ye / 4 + 1;
     if (ye % 4 == 0 && t->m <= 2) {
-        lpdays--;
+        leap_days--;
     }
 
     // Compute the number of days elapsed since Jan 5/Jan 6, 1980.
-    const int de = ye * 365 + doy[t->m - 1] + t->d + lpdays - 6;
+    const int de = ye * 365 + doy[t->m - 1] + t->d + leap_days - 6;
 
     // Convert time to GPS weeks and seconds.
     g->week = de / 7;
@@ -604,8 +604,7 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
     D30    00 1011 0111 1010 1000 1001 1100 0000
     */
 
-    constexpr std::array<uint32_t, 6> b_mask = {
-        0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
+    constexpr std::array<uint32_t, 6> b_mask{0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
 
     unsigned long       d   = source & 0x3FFFFFC0UL;
     const unsigned long d29 = source >> 31 & 0x1UL;
@@ -1143,7 +1142,7 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t
     rho->g = g;
 
     // Azimuth and elevation angles.
-    double neu[3];
+    double     neu[3];
     const auto llh = xyz2llh(xyz);
 
     double tmat[3][3];

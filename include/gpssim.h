@@ -37,7 +37,7 @@ constexpr size_t N_DWORD_SBF = 10; // 10 word per subframe
 constexpr auto N_DWORD = (N_SBF + 1) * N_DWORD_SBF; // Subframe word buffer size
 
 /*! \brief C/A code sequence length */
-constexpr auto CA_SEQ_LEN = 1023;
+constexpr size_t CA_SEQ_LEN = 1023;
 
 constexpr auto SECONDS_IN_WEEK      = 604800.0;
 constexpr auto SECONDS_IN_HALF_WEEK = 302400.0;
