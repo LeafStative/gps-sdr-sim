@@ -476,7 +476,7 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[2][9] = (iode & 0xFFUL) << 22 | (idot & 0x3FFFUL) << 8;
 
     constexpr unsigned long data_id = 1UL;
-    if (ionoutc.vflg == TRUE) {
+    if (ionoutc.vflag) {
         constexpr unsigned long sbf4_page18_sv_id = 56UL;
 
         const signed long   alpha0 = static_cast<signed long>(std::round(ionoutc.alpha0 / POW2_M30));
@@ -487,8 +487,8 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
         const signed long   beta1  = static_cast<signed long>(std::round(ionoutc.beta1 / 16384.0));
         const signed long   beta2  = static_cast<signed long>(std::round(ionoutc.beta2 / 65536.0));
         const signed long   beta3  = static_cast<signed long>(std::round(ionoutc.beta3 / 65536.0));
-        const signed long   a0     = static_cast<signed long>(std::round(ionoutc.A0 / POW2_M30));
-        const signed long   a1     = static_cast<signed long>(std::round(ionoutc.A1 / POW2_M50));
+        const signed long   a0     = static_cast<signed long>(std::round(ionoutc.a0 / POW2_M30));
+        const signed long   a1     = static_cast<signed long>(std::round(ionoutc.a1 / POW2_M50));
         const signed long   dtls   = ionoutc.dtls;
         const unsigned long tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
         const unsigned long wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
@@ -496,7 +496,7 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
         // 2016/12/31 (Sat) -> WNlsf = 1929, DN = 7 (http://navigationservices.agi.com/GNSSWeb/)
         // Days are counted from 1 to 7 (Sunday is 1).
         unsigned long wnlsf, dtlsf, dn;
-        if (ionoutc.leapen == TRUE) {
+        if (ionoutc.leapen) {
             wnlsf = static_cast<unsigned long>(ionoutc.wnlsf % 256);
             dn    = static_cast<unsigned long>(ionoutc.dn);
             dtlsf = static_cast<unsigned long>(ionoutc.dtlsf);
@@ -749,12 +749,12 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
             strncpy(tmp, str + 3, 19);
             tmp[19] = 0;
             replaceExpDesignator(tmp, 19);
-            ionoutc->A0 = atof(tmp);
+            ionoutc->a0 = atof(tmp);
 
             strncpy(tmp, str + 22, 19);
             tmp[19] = 0;
             replaceExpDesignator(tmp, 19);
-            ionoutc->A1 = atof(tmp);
+            ionoutc->a1 = atof(tmp);
 
             strncpy(tmp, str + 41, 9);
             tmp[9]       = 0;
@@ -774,9 +774,9 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         }
     }
 
-    ionoutc->vflg = FALSE;
+    ionoutc->vflag = false;
     if (flags == 0xF) { // Read all Iono/UTC lines
-        ionoutc->vflg = TRUE;
+        ionoutc->vflag = true;
     }
 
     // Read ephemeris blocks
@@ -1005,7 +1005,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 
 double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 &llh, double *azel) {
 
-    if (ionoutc->enable == FALSE) { // No ionospheric delay
+    if (!ionoutc->enable) { // No ionospheric delay
         return 0.0;
     }
 
@@ -1014,7 +1014,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 
     const double F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
 
     double iono_delay;
-    if (ionoutc->vflg == FALSE) {
+    if (!ionoutc->vflag) {
         iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
     } else {
         // Earth's central angle between the user position and the earth projection of
@@ -1572,8 +1572,8 @@ int main(int argc, char *argv[]) {
     iduration      = USER_MOTION_SIZE;
     duration       = static_cast<double>(iduration) / 10.0; // Default duration
     verb           = FALSE;
-    ionoutc.enable = TRUE;
-    ionoutc.leapen = FALSE;
+    ionoutc.enable = true;
+    ionoutc.leapen = false;
 
     if (argc < 3) {
         usage();
@@ -1632,7 +1632,7 @@ int main(int argc, char *argv[]) {
             break;
         case 'L':
             // enable custom Leap Event
-            ionoutc.leapen = TRUE;
+            ionoutc.leapen = true;
             sscanf(optarg, "%d,%d,%d", &ionoutc.wnlsf, &ionoutc.dn, &ionoutc.dtlsf);
             if (ionoutc.dn < 1 || ionoutc.dn > 7) {
                 std::cerr << "ERROR: Invalid GPS day number\n";
@@ -1681,7 +1681,7 @@ int main(int argc, char *argv[]) {
             duration = atof(optarg);
             break;
         case 'i':
-            ionoutc.enable = FALSE; // Disable ionospheric correction
+            ionoutc.enable = false; // Disable ionospheric correction
             break;
         case 'p':
             if (optind < argc && argv[optind][0] != '-') { // Check if next item is an argument
@@ -1794,12 +1794,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (verb == TRUE && ionoutc.vflg == TRUE) {
+    if (verb == TRUE && ionoutc.vflag) {
         std::cerr << std::format(
             "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
         std::cerr << std::format(
             "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.beta0, ionoutc.beta1, ionoutc.beta2, ionoutc.beta3);
-        std::cerr << std::format("   {:19.11e} {:19.11e}  {:9d} {:9d}\n", ionoutc.A0, ionoutc.A1, ionoutc.tot, ionoutc.wnt);
+        std::cerr << std::format("   {:19.11e} {:19.11e}  {:9d} {:9d}\n", ionoutc.a0, ionoutc.a1, ionoutc.tot, ionoutc.wnt);
         std::cerr << std::format("{:6d}\n", ionoutc.dtls);
     }
 
@@ -1841,7 +1841,7 @@ int main(int argc, char *argv[]) {
             ionoutc.tot = static_cast<int>(gtmp.sec);
 
             // Iono/UTC parameters may no longer valid
-            // ionoutc.vflg = FALSE;
+            // ionoutc.vflag = FALSE;
 
             // Overwrite the TOC and TOE to the scenario start time
             for (size_t sv = 0; sv < MAX_SAT; sv++) {

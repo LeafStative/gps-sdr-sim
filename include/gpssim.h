@@ -137,15 +137,25 @@ struct ephem_t {
 };
 
 struct ionoutc_t {
-    int    enable;
-    int    vflg;
-    double alpha0, alpha1, alpha2, alpha3;
-    double beta0, beta1, beta2, beta3;
-    double A0, A1;
-    int    dtls, tot, wnt;
-    int    dtlsf, dn, wnlsf;
-    // enable custom leap event
-    int leapen;
+    bool   enable;
+    bool   vflag;
+    bool   leapen; // enable custom leap event
+    int    dtls;
+    int    tot;
+    int    wnt;
+    int    dtlsf;
+    int    dn;
+    int    wnlsf;
+    double alpha0;
+    double alpha1;
+    double alpha2;
+    double alpha3;
+    double beta0;
+    double beta1;
+    double beta2;
+    double beta3;
+    double a0;
+    double a1;
 };
 
 struct range_t {
@@ -169,15 +179,15 @@ struct channel_t {
     unsigned int carr_phase;     /*< Carrier phase */
     int          carr_phasestep; /*< Carrier phasestep */
 #endif
-    double        code_phase;         /*< Code phase */
-    gpstime_t     g0;                 /*!< GPS time at start */
+    double        code_phase;          /*< Code phase */
+    gpstime_t     g0;                  /*!< GPS time at start */
     unsigned long sbf[5][N_DWORD_SBF]; /*!< current subframe */
     unsigned long dwrd[N_DWORD];       /*!< Data words of sub-frame */
-    int           iword;              /*!< initial word */
-    int           ibit;               /*!< initial bit */
-    int           icode;              /*!< initial code */
-    int           dataBit;            /*!< current data bit */
-    int           codeCA;             /*!< current C/A code */
+    int           iword;               /*!< initial word */
+    int           ibit;                /*!< initial bit */
+    int           icode;               /*!< initial code */
+    int           dataBit;             /*!< current data bit */
+    int           codeCA;              /*!< current C/A code */
     double        azel[2];
     range_t       rho0;
 };
