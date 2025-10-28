@@ -192,7 +192,7 @@ datetime_t gps2date(const gpstime_t &g) {
         .d   = c - e - static_cast<int>(30.6001 * f),
         .hh  = static_cast<int>(g.sec / 3600.0) % 24,
         .mm  = static_cast<int>(g.sec / 60.0) % 60,
-        .sec = g.sec - 60.0 * floor(g.sec / 60.0)};
+        .sec = g.sec - 60.0 * std::floor(g.sec / 60.0)};
 }
 
 /*! \brief Convert Earth-centered Earth-fixed (ECEF) into Lat/Long/Height
@@ -219,9 +219,9 @@ vec3 xyz2llh(const vec3 &xyz) {
     double zdz, nh, n;
     while (true) {
         zdz                 = z + dz;
-        nh                  = sqrt(rho2 + zdz * zdz);
+        nh                  = std::sqrt(rho2 + zdz * zdz);
         const double slat   = zdz / nh;
-        n                   = a / sqrt(1.0 - e2 * slat * slat);
+        n                   = a / std::sqrt(1.0 - e2 * slat * slat);
         const double dz_new = n * e2 * slat;
 
         if (std::abs(dz - dz_new) < eps) {
@@ -231,8 +231,8 @@ vec3 xyz2llh(const vec3 &xyz) {
     }
 
     return vec3{
-        atan2(zdz, sqrt(rho2)), //
-        atan2(y, x),
+        std::atan2(zdz, std::sqrt(rho2)), //
+        std::atan2(y, x),
         nh - n};
 }
 
@@ -245,13 +245,13 @@ vec3 llh2xyz(const vec3 &llh) {
     constexpr double e  = WGS84_ECCENTRICITY;
     constexpr double e2 = e * e;
 
-    const double c_lat = cos(llh.x);
-    const double s_lat = sin(llh.x);
-    const double c_lon = cos(llh.y);
-    const double s_lon = sin(llh.y);
+    const double c_lat = std::cos(llh.x);
+    const double s_lat = std::sin(llh.x);
+    const double c_lon = std::cos(llh.y);
+    const double s_lon = std::sin(llh.y);
     const double d     = e * s_lat;
 
-    const double n   = a / sqrt(1.0 - d * d);
+    const double n   = a / std::sqrt(1.0 - d * d);
     const double nph = n + llh.z;
 
     const double tmp = nph * c_lat;
@@ -267,10 +267,10 @@ vec3 llh2xyz(const vec3 &llh) {
  *  \param[out] t Three-by-Three output matrix
  */
 void ltcmat(const vec3 &llh, double t[3][3]) {
-    const double s_lat = sin(llh.x);
-    const double c_lat = cos(llh.x);
-    const double s_lon = sin(llh.y);
-    const double c_lon = cos(llh.y);
+    const double s_lat = std::sin(llh.x);
+    const double c_lat = std::cos(llh.x);
+    const double s_lon = std::sin(llh.y);
+    const double c_lon = std::cos(llh.y);
 
     t[0][0] = -s_lat * c_lon;
     t[0][1] = -s_lat * s_lon;
