@@ -267,7 +267,6 @@ vec3 llh2xyz(const vec3 &llh) {
  *  \param[out] t Three-by-Three output matrix
  */
 void ltcmat(const vec3 &llh, double t[3][3]) {
-
     const double s_lat = sin(llh.x);
     const double c_lat = cos(llh.x);
     const double s_lon = sin(llh.y);
@@ -285,26 +284,30 @@ void ltcmat(const vec3 &llh, double t[3][3]) {
 }
 
 /*! \brief Convert Earth-centered Earth-Fixed to ?
- *  \param[in] xyz Input position as vector in ECEF format
+ *  \param[in] ecef Input position as vector in ECEF format
  *  \param[in] t Intermediate matrix computed by \ref ltcmat
- *  \param[out] neu Output position as North-East-Up format
+ *  \return Output position as North-East-Up format
  */
-void ecef2neu(const vec3 &xyz, double t[3][3], double *neu) {
-    neu[0] = t[0][0] * xyz.x + t[0][1] * xyz.y + t[0][2] * xyz.z;
-    neu[1] = t[1][0] * xyz.x + t[1][1] * xyz.y + t[1][2] * xyz.z;
-    neu[2] = t[2][0] * xyz.x + t[2][1] * xyz.y + t[2][2] * xyz.z;
+vec3 ecef2neu(const vec3 &ecef, double t[3][3]) {
+    return vec3{
+        t[0][0] * ecef.x + t[0][1] * ecef.y + t[0][2] * ecef.z,
+        t[1][0] * ecef.x + t[1][1] * ecef.y + t[1][2] * ecef.z,
+        t[2][0] * ecef.x + t[2][1] * ecef.y + t[2][2] * ecef.z};
 }
 
 /*! \brief Convert North-East-Up to Azimuth + Elevation
  *  \param[in] neu Input position in North-East-Up format
  *  \param[out] azel Output array of azimuth + elevation as double
  */
-void neu2azel(double *azel, const double *neu) {
-    azel[0] = atan2(neu[1], neu[0]);
-    if (azel[0] < 0.0) azel[0] += 2.0 * PI;
+void neu2azel(const vec3 &neu, double azel[2]) {
+    auto azimuth = std::atan2(neu.y, neu.x);
+    if (azimuth < 0.0) {
+        azimuth += 2.0 * PI;
+    }
 
-    const double ne = sqrt(neu[0] * neu[0] + neu[1] * neu[1]);
-    azel[1]         = atan2(neu[2], ne);
+    const double ne = std::sqrt(neu.x * neu.x + neu.y * neu.y);
+    azel[0]         = azimuth;
+    azel[1]         = std::atan2(neu.z, ne);
 }
 
 /*! \brief Compute Satellite position, velocity and clock at given time
@@ -1134,13 +1137,13 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t
     rho->g = g;
 
     // Azimuth and elevation angles.
-    double     neu[3];
     const auto llh = xyz2llh(xyz);
 
     double tmat[3][3];
     ltcmat(llh, tmat);
-    ecef2neu(los, tmat, neu);
-    neu2azel(rho->azel, neu);
+
+    const auto neu = ecef2neu(los, tmat);
+    neu2azel(neu, rho->azel);
 
     // Add ionospheric delay
     rho->iono_delay = ionosphericDelay(ionoutc, g, llh, rho->azel);
@@ -1399,7 +1402,6 @@ int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
 }
 
 int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
-    double neu[3];
     double clk[3];
     double tmat[3][3];
 
@@ -1414,8 +1416,8 @@ int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const do
     satpos(eph, g, pos, vel, clk);
 
     const auto los = pos - xyz;
-    ecef2neu(los, tmat, neu);
-    neu2azel(azel, neu);
+    const auto neu = ecef2neu(los, tmat);
+    neu2azel(neu, azel);
 
     if (azel[1] * R2D > elvMask) { // Visible
         return 1;
