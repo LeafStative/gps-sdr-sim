@@ -174,20 +174,25 @@ gpstime_t date2gps(const datetime_t &t) {
             static_cast<double>(days_elapsed % 7) * SECONDS_IN_DAY + t.hh * SECONDS_IN_HOUR + t.mm * SECONDS_IN_MINUTE + t.sec};
 }
 
-void gps2date(const gpstime_t *g, datetime_t *t) {
+/*! \brief Convert a UTC date into a GPS date
+ *  \param[in] g input date in GPS form
+ *  \return g output date in UTC form
+ */
+datetime_t gps2date(const gpstime_t &g) {
     // Convert Julian day number to calendar date
-    const int c = static_cast<int>(7 * g->week + std::floor(g->sec / 86400.0) + 2444245.0) + 1537;
+    const int c = static_cast<int>(7 * g.week + std::floor(g.sec / 86400.0) + 2444245.0) + 1537;
     const int d = static_cast<int>((c - 122.1) / 365.25);
     const int e = 365 * d + d / 4;
     const int f = static_cast<int>((c - e) / 30.6001);
 
-    t->d = c - e - static_cast<int>(30.6001 * f);
-    t->m = f - 1 - 12 * (f / 14);
-    t->y = d - 4715 - (7 + t->m) / 10;
-
-    t->hh  = static_cast<int>(g->sec / 3600.0) % 24;
-    t->mm  = static_cast<int>(g->sec / 60.0) % 60;
-    t->sec = g->sec - 60.0 * floor(g->sec / 60.0);
+    const auto minutes = f - 1 - 12 * (f / 14);
+    return datetime_t{
+        .y   = d - 4715 - (7 + minutes) / 10,
+        .m   = f - minutes,
+        .d   = c - e - static_cast<int>(30.6001 * f),
+        .hh  = static_cast<int>(g.sec / 3600.0) % 24,
+        .mm  = static_cast<int>(g.sec / 60.0) % 60,
+        .sec = g.sec - 60.0 * floor(g.sec / 60.0)};
 }
 
 /*! \brief Convert Earth-centered Earth-fixed (ECEF) into Lat/Long/Height
@@ -1840,14 +1845,12 @@ int main(int argc, char *argv[]) {
 
     if (g0.week >= 0) { // Scenario start time has been set.
         if (timeoverwrite == TRUE) {
-            gpstime_t  gtmp;
-            datetime_t ttmp;
-            double     dsec;
+            gpstime_t gtmp;
 
             gtmp.week = g0.week;
             gtmp.sec  = static_cast<double>(static_cast<int>(g0.sec) / 7200) * 7200.0;
 
-            dsec = subGpsTime(gtmp, gmin);
+            const auto d_sec = subGpsTime(gtmp, gmin);
 
             // Overwrite the UTC reference week number
             ionoutc.wnt = gtmp.week;
@@ -1860,12 +1863,12 @@ int main(int argc, char *argv[]) {
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
                 for (int i = 0; i < neph; i++) {
                     if (eph[i][sv].vflg == 1) {
-                        gtmp = incGpsTime(eph[i][sv].toc, dsec);
-                        gps2date(&gtmp, &ttmp);
-                        eph[i][sv].toc = gtmp;
-                        eph[i][sv].t   = ttmp;
+                        gtmp             = incGpsTime(eph[i][sv].toc, d_sec);
+                        const auto t_tmp = gps2date(gtmp);
+                        eph[i][sv].toc   = gtmp;
+                        eph[i][sv].t     = t_tmp;
 
-                        gtmp           = incGpsTime(eph[i][sv].toe, dsec);
+                        gtmp           = incGpsTime(eph[i][sv].toe, d_sec);
                         eph[i][sv].toe = gtmp;
                     }
                 }
