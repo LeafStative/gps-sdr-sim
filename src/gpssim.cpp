@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <format>
 #include <fstream>
@@ -112,18 +113,6 @@ namespace {
 
 std::array<int, MAX_SAT>           allocated_sat;
 std::array<vec3, USER_MOTION_SIZE> xyz;
-
-/*! \brief Count number of bits set to 1
- *  \param[in] v long word in which bits are counted
- *  \returns Count of bits set to 1
- */
-uint32_t count_bits(const uint32_t v) {
-    // Algorithm from stackoverflow
-    auto count = v - (v >> 1 & 033333333333) - (v >> 2 & 011111111111);
-    count      = (count + (count >> 3) & 030707070707) % 63;
-
-    return count;
-}
 
 /* !\brief generate the C/A code sequence for a given Satellite Vehicle PRN
  *  \param[in] prn PRN number of the Satellite Vehicle
@@ -616,10 +605,10 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
         with zeros in bits 29 and 30.
         */
 
-        if ((d30 + count_bits(b_mask[4] & d)) % 2) {
+        if ((d30 + std::popcount(b_mask[4] & d)) % 2) {
             d ^= 0x1UL << 6;
         }
-        if ((d29 + count_bits(b_mask[5] & d)) % 2) {
+        if ((d29 + std::popcount(b_mask[5] & d)) % 2) {
             d ^= 0x1UL << 7;
         }
     }
@@ -629,12 +618,12 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
         result ^= 0x3FFFFFC0UL;
     }
 
-    result |= ((d29 + count_bits(b_mask[0] & d)) % 2) << 5;
-    result |= ((d30 + count_bits(b_mask[1] & d)) % 2) << 4;
-    result |= ((d29 + count_bits(b_mask[2] & d)) % 2) << 3;
-    result |= ((d30 + count_bits(b_mask[3] & d)) % 2) << 2;
-    result |= ((d30 + count_bits(b_mask[4] & d)) % 2) << 1;
-    result |= (d29 + count_bits(b_mask[5] & d)) % 2;
+    result |= ((d29 + std::popcount(b_mask[0] & d)) % 2) << 5;
+    result |= ((d30 + std::popcount(b_mask[1] & d)) % 2) << 4;
+    result |= ((d29 + std::popcount(b_mask[2] & d)) % 2) << 3;
+    result |= ((d30 + std::popcount(b_mask[3] & d)) % 2) << 2;
+    result |= ((d30 + std::popcount(b_mask[4] & d)) % 2) << 1;
+    result |= (d29 + std::popcount(b_mask[5] & d)) % 2;
 
     result &= 0x3FFFFFFFUL;
     // D |= (source & 0xC0000000UL); // Add D29* and D30* from source data bits
