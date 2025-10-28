@@ -154,25 +154,24 @@ void codegen(int *ca, const int prn) {
 
 /*! \brief Convert a UTC date into a GPS date
  *  \param[in] t input date in UTC form
- *  \param[out] g output date in GPS form
+ *  \return g output date in GPS form
  */
-void date2gps(const datetime_t *t, gpstime_t *g) {
+gpstime_t date2gps(const datetime_t &t) {
     constexpr std::array<int, 12> doy{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
-    const int ye = t->y - 1980;
+    const int year = t.y - 1980;
 
     // Compute the number of leap days since Jan 5/Jan 6, 1980.
-    int leap_days = ye / 4 + 1;
-    if (ye % 4 == 0 && t->m <= 2) {
-        leap_days--;
-    }
+    const int leap_days = year % 4 == 0 && t.m <= 2 ? year / 4 : year / 4 + 1;
 
     // Compute the number of days elapsed since Jan 5/Jan 6, 1980.
-    const int de = ye * 365 + doy[t->m - 1] + t->d + leap_days - 6;
+    const int days_elapsed = year * 365 + doy[t.m - 1] + t.d + leap_days - 6;
 
     // Convert time to GPS weeks and seconds.
-    g->week = de / 7;
-    g->sec  = static_cast<double>(de % 7) * SECONDS_IN_DAY + t->hh * SECONDS_IN_HOUR + t->mm * SECONDS_IN_MINUTE + t->sec;
+    return gpstime_t{
+        .week = days_elapsed / 7,
+        .sec =
+            static_cast<double>(days_elapsed % 7) * SECONDS_IN_DAY + t.hh * SECONDS_IN_HOUR + t.mm * SECONDS_IN_MINUTE + t.sec};
 }
 
 void gps2date(const gpstime_t *g, datetime_t *t) {
@@ -828,8 +827,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         tmp[2] = 0;
         t.sec  = atof(tmp);
 
-        gpstime_t g;
-        date2gps(&t, &g);
+        const auto g = date2gps(t);
 
         if (g0.week == -1) {
             g0 = g;
@@ -1676,7 +1674,7 @@ int main(int argc, char *argv[]) {
                 t0.mm  = gmt->tm_min;
                 t0.sec = static_cast<double>(gmt->tm_sec);
 
-                date2gps(&t0, &g0);
+                g0 = date2gps(t0);
 
                 break;
             }
@@ -1688,7 +1686,7 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             t0.sec = floor(t0.sec);
-            date2gps(&t0, &g0);
+            g0     = date2gps(t0);
             break;
         case 'd':
             duration = atof(optarg);
