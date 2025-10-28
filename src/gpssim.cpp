@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
+#include <span>
 #include <string>
 
 #include <scn/scan.h>
@@ -317,106 +318,83 @@ void neu2azel(const vec3 &neu, double azel[2]) {
  *  \param[out] vel Computed velocity (vector)
  *  \param[out] clk Computed clock
  */
-void satpos(ephem_t eph, gpstime_t g, vec3 &pos, vec3 &vel, double *clk) {
+void satpos(const ephem_t &eph, const gpstime_t &g, vec3 &pos, vec3 &vel, std::span<double, 2> clk) {
     // Computing Satellite Velocity using the Broadcast Ephemeris
     // http://www.ngs.noaa.gov/gps-toolbox/bc_velo.htm
 
-    double tk;
-    double mk;
-    double ek;
-    double ekold;
-    double ekdot;
-    double cek, sek;
-    double pk;
-    double pkdot;
-    double c2pk, s2pk;
-    double uk;
-    double ukdot;
-    double cuk, suk;
-    double ok;
-    double sok, cok;
-    double ik;
-    double ikdot;
-    double sik, cik;
-    double rk;
-    double rkdot;
-    double xpk, ypk;
-    double xpkdot, ypkdot;
-
-    double relativistic, OneMinusecosE, tmp;
-
-    tk = g.sec - eph.toe.sec;
-
-    if (tk > SECONDS_IN_HALF_WEEK)
+    auto tk = g.sec - eph.toe.sec;
+    if (tk > SECONDS_IN_HALF_WEEK) {
         tk -= SECONDS_IN_WEEK;
-    else if (tk < -SECONDS_IN_HALF_WEEK)
+    } else if (tk < -SECONDS_IN_HALF_WEEK) {
         tk += SECONDS_IN_WEEK;
-
-    mk    = eph.m0 + eph.n * tk;
-    ek    = mk;
-    ekold = ek + 1.0;
-
-    OneMinusecosE = 0; // Suppress the uninitialized warning.
-    while (fabs(ek - ekold) > 1.0E-14) {
-        ekold         = ek;
-        OneMinusecosE = 1.0 - eph.ecc * cos(ekold);
-        ek            = ek + (mk - ekold + eph.ecc * sin(ekold)) / OneMinusecosE;
     }
 
-    sek = sin(ek);
-    cek = cos(ek);
+    const auto mk     = eph.m0 + eph.n * tk;
+    auto       ek     = mk;
+    auto       ek_old = ek + 1.0;
 
-    ekdot = eph.n / OneMinusecosE;
+    double one_minus_ecos_e = 0; // Suppress the uninitialized warning.
+    while (std::abs(ek - ek_old) > 1.0E-14) {
+        ek_old           = ek;
+        one_minus_ecos_e = 1.0 - eph.ecc * std::cos(ek_old);
+        ek               = ek + (mk - ek_old + eph.ecc * std::sin(ek_old)) / one_minus_ecos_e;
+    }
 
-    relativistic = -4.442807633E-10 * eph.ecc * eph.sqrta * sek;
+    const auto sek = std::sin(ek);
+    const auto cek = std::cos(ek);
 
-    pk    = atan2(eph.sq1e2 * sek, cek - eph.ecc) + eph.aop;
-    pkdot = eph.sq1e2 * ekdot / OneMinusecosE;
+    const auto ek_dot = eph.n / one_minus_ecos_e;
 
-    s2pk = sin(2.0 * pk);
-    c2pk = cos(2.0 * pk);
+    const auto relativistic = -4.442807633E-10 * eph.ecc * eph.sqrta * sek;
 
-    uk    = pk + eph.cus * s2pk + eph.cuc * c2pk;
-    suk   = sin(uk);
-    cuk   = cos(uk);
-    ukdot = pkdot * (1.0 + 2.0 * (eph.cus * c2pk - eph.cuc * s2pk));
+    const auto pk     = std::atan2(eph.sq1e2 * sek, cek - eph.ecc) + eph.aop;
+    const auto pk_dot = eph.sq1e2 * ek_dot / one_minus_ecos_e;
 
-    rk    = eph.A * OneMinusecosE + eph.crc * c2pk + eph.crs * s2pk;
-    rkdot = eph.A * eph.ecc * sek * ekdot + 2.0 * pkdot * (eph.crs * c2pk - eph.crc * s2pk);
+    const auto s_2pk = std::sin(2.0 * pk);
+    const auto c_2pk = std::cos(2.0 * pk);
 
-    ik    = eph.inc0 + eph.idot * tk + eph.cic * c2pk + eph.cis * s2pk;
-    sik   = sin(ik);
-    cik   = cos(ik);
-    ikdot = eph.idot + 2.0 * pkdot * (eph.cis * c2pk - eph.cic * s2pk);
+    const auto uk     = pk + eph.cus * s_2pk + eph.cuc * c_2pk;
+    const auto s_uk   = std::sin(uk);
+    const auto c_uk   = std::cos(uk);
+    const auto uk_dot = pk_dot * (1.0 + 2.0 * (eph.cus * c_2pk - eph.cuc * s_2pk));
 
-    xpk    = rk * cuk;
-    ypk    = rk * suk;
-    xpkdot = rkdot * cuk - ypk * ukdot;
-    ypkdot = rkdot * suk + xpk * ukdot;
+    const auto rk     = eph.A * one_minus_ecos_e + eph.crc * c_2pk + eph.crs * s_2pk;
+    const auto rk_dot = eph.A * eph.ecc * sek * ek_dot + 2.0 * pk_dot * (eph.crs * c_2pk - eph.crc * s_2pk);
 
-    ok  = eph.omg0 + tk * eph.omgkdot - OMEGA_EARTH * eph.toe.sec;
-    sok = sin(ok);
-    cok = cos(ok);
+    const auto ik     = eph.inc0 + eph.idot * tk + eph.cic * c_2pk + eph.cis * s_2pk;
+    const auto s_ik   = std::sin(ik);
+    const auto c_ik   = std::cos(ik);
+    const auto ik_dot = eph.idot + 2.0 * pk_dot * (eph.cis * c_2pk - eph.cic * s_2pk);
+
+    const auto xpk     = rk * c_uk;
+    const auto ypk     = rk * s_uk;
+    const auto xpk_dot = rk_dot * c_uk - ypk * uk_dot;
+    const auto ypk_dot = rk_dot * s_uk + xpk * uk_dot;
+
+    const auto ok   = eph.omg0 + tk * eph.omgkdot - OMEGA_EARTH * eph.toe.sec;
+    const auto s_ok = std::sin(ok);
+    const auto c_ok = std::cos(ok);
 
     pos = vec3{
-        xpk * cok - ypk * cik * sok, //
-        xpk * sok + ypk * cik * cok,
-        ypk * sik};
+        xpk * c_ok - ypk * c_ik * s_ok, //
+        xpk * s_ok + ypk * c_ik * c_ok,
+        ypk * s_ik};
 
-    tmp = ypkdot * cik - ypk * sik * ikdot;
+    const auto tmp = ypk_dot * c_ik - ypk * s_ik * ik_dot;
 
     vel = vec3{
-        -eph.omgkdot * pos.y + xpkdot * cok - tmp * sok,
-        eph.omgkdot * pos.x + xpkdot * sok + tmp * cok,
-        ypk * cik * ikdot + ypkdot * sik};
+        -eph.omgkdot * pos.y + xpk_dot * c_ok - tmp * s_ok,
+        eph.omgkdot * pos.x + xpk_dot * s_ok + tmp * c_ok,
+        ypk * c_ik * ik_dot + ypk_dot * s_ik};
 
     // Satellite clock correction
     tk = g.sec - eph.toc.sec;
 
-    if (tk > SECONDS_IN_HALF_WEEK)
+    if (tk > SECONDS_IN_HALF_WEEK) {
         tk -= SECONDS_IN_WEEK;
-    else if (tk < -SECONDS_IN_HALF_WEEK)
+    } else if (tk < -SECONDS_IN_HALF_WEEK) {
         tk += SECONDS_IN_WEEK;
+    }
 
     clk[0] = eph.af0 + tk * (eph.af1 + tk * eph.af2) + relativistic - eph.tgd;
     clk[1] = eph.af1 + 2.0 * tk * eph.af2;
@@ -1102,8 +1080,8 @@ double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 
  */
 void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
-    vec3   pos, vel;
-    double clk[2];
+    vec3                  pos, vel;
+    std::array<double, 2> clk;
     satpos(eph, g, pos, vel, clk);
 
     // Receiver to satellite vector and light-time.
@@ -1402,7 +1380,6 @@ int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
 }
 
 int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
-    double clk[3];
     double tmat[3][3];
 
     if (eph.vflg != 1) { // Invalid
@@ -1412,7 +1389,8 @@ int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const do
     const auto llh = xyz2llh(xyz);
     ltcmat(llh, tmat);
 
-    vec3 pos, vel;
+    vec3                  pos, vel;
+    std::array<double, 2> clk;
     satpos(eph, g, pos, vel, clk);
 
     const auto los = pos - xyz;
