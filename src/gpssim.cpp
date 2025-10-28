@@ -407,75 +407,23 @@ void satpos(const ephem_t &eph, const gpstime_t &g, vec3 &pos, vec3 &vel, std::s
 void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_DWORD_SBF]) {
     // FIXED: This has to be the "transmission" week number, not for the ephemeris reference time
     // wn = (unsigned long)(eph.toe.week%1024);
-    constexpr unsigned long wn = 0UL;
+    constexpr unsigned long wn  = 0UL;
+    constexpr unsigned long ura = 0UL;
 
-    const unsigned long toe    = static_cast<unsigned long>(eph.toe.sec / 16.0);
-    const unsigned long toc    = static_cast<unsigned long>(eph.toc.sec / 16.0);
-    const unsigned long iode   = static_cast<unsigned long>(eph.iode);
-    const unsigned long iodc   = static_cast<unsigned long>(eph.iodc);
-    const long          deltan = static_cast<long>(eph.deltan / POW2_M43 / PI);
-    const long          cuc    = static_cast<long>(eph.cuc / POW2_M29);
-    const long          cus    = static_cast<long>(eph.cus / POW2_M29);
-    const long          cic    = static_cast<long>(eph.cic / POW2_M29);
-    const long          cis    = static_cast<long>(eph.cis / POW2_M29);
-    const long          crc    = static_cast<long>(eph.crc / POW2_M5);
-    const long          crs    = static_cast<long>(eph.crs / POW2_M5);
-    const unsigned long ecc    = static_cast<unsigned long>(eph.ecc / POW2_M33);
-    const unsigned long sqrta  = static_cast<unsigned long>(eph.sqrta / POW2_M19);
-    const long          m0     = static_cast<long>(eph.m0 / POW2_M31 / PI);
-    const long          omg0   = static_cast<long>(eph.omg0 / POW2_M31 / PI);
-    const long          inc0   = static_cast<long>(eph.inc0 / POW2_M31 / PI);
-    const long          aop    = static_cast<long>(eph.aop / POW2_M31 / PI);
-    const long          omgdot = static_cast<long>(eph.omgdot / POW2_M43 / PI);
-    const long          idot   = static_cast<long>(eph.idot / POW2_M43 / PI);
-    const long          af0    = static_cast<long>(eph.af0 / POW2_M31);
-    const long          af1    = static_cast<long>(eph.af1 / POW2_M43);
-    const long          af2    = static_cast<long>(eph.af2 / POW2_M55);
-    const long          tgd    = static_cast<long>(eph.tgd / POW2_M31);
-    const int           svhlth = static_cast<unsigned long>(eph.svhlth);
-    const int           codeL2 = static_cast<unsigned long>(eph.codeL2);
+    const unsigned long code_l2 = static_cast<unsigned long>(eph.codeL2);
+    const unsigned long svhlth  = static_cast<unsigned long>(eph.svhlth);
+    const unsigned long iodc    = static_cast<unsigned long>(eph.iodc);
+    const long          tgd     = static_cast<long>(eph.tgd / POW2_M31);
+    const unsigned long toc     = static_cast<unsigned long>(eph.toc.sec / 16.0);
+    const long          af0     = static_cast<long>(eph.af0 / POW2_M31);
+    const long          af1     = static_cast<long>(eph.af1 / POW2_M43);
+    const long          af2     = static_cast<long>(eph.af2 / POW2_M55);
 
-    constexpr unsigned long ura              = 0UL;
-    constexpr unsigned long dataId           = 1UL;
-    constexpr unsigned long sbf4_page25_svId = 63UL;
-    constexpr unsigned long sbf5_page25_svId = 51UL;
-
-    const unsigned long wna = static_cast<unsigned long>(eph.toe.week % 256);
-    const unsigned long toa = static_cast<unsigned long>(eph.toe.sec / 4096.0);
-
-    const signed long   alpha0 = static_cast<signed long>(round(ionoutc.alpha0 / POW2_M30));
-    const signed long   alpha1 = static_cast<signed long>(round(ionoutc.alpha1 / POW2_M27));
-    const signed long   alpha2 = static_cast<signed long>(round(ionoutc.alpha2 / POW2_M24));
-    const signed long   alpha3 = static_cast<signed long>(round(ionoutc.alpha3 / POW2_M24));
-    const signed long   beta0  = static_cast<signed long>(round(ionoutc.beta0 / 2048.0));
-    const signed long   beta1  = static_cast<signed long>(round(ionoutc.beta1 / 16384.0));
-    const signed long   beta2  = static_cast<signed long>(round(ionoutc.beta2 / 65536.0));
-    const signed long   beta3  = static_cast<signed long>(round(ionoutc.beta3 / 65536.0));
-    const signed long   A0     = static_cast<signed long>(round(ionoutc.A0 / POW2_M30));
-    const signed long   A1     = static_cast<signed long>(round(ionoutc.A1 / POW2_M50));
-    const signed long   dtls   = ionoutc.dtls;
-    const unsigned long tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
-    const unsigned long wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
-
-    const unsigned long sbf4_page18_svId = 56UL;
-
-    // 2016/12/31 (Sat) -> WNlsf = 1929, DN = 7 (http://navigationservices.agi.com/GNSSWeb/)
-    // Days are counted from 1 to 7 (Sunday is 1).
-    unsigned long wnlsf, dtlsf, dn;
-    if (ionoutc.leapen == TRUE) {
-        wnlsf = static_cast<unsigned long>(ionoutc.wnlsf % 256);
-        dn    = static_cast<unsigned long>(ionoutc.dn);
-        dtlsf = static_cast<unsigned long>(ionoutc.dtlsf);
-    } else {
-        wnlsf = 1929 % 256;
-        dn    = 7;
-        dtlsf = 18;
-    }
     // Subframe 1
     sbf[0][0] = 0x8B0000UL << 6;
     sbf[0][1] = 0x1UL << 8;
     sbf[0][2] =
-        (wn & 0x3FFUL) << 20 | (codeL2 & 0x3UL) << 18 | (ura & 0xFUL) << 14 | (svhlth & 0x3FUL) << 8 | (iodc >> 8 & 0x3UL) << 6;
+        (wn & 0x3FFUL) << 20 | (code_l2 & 0x3UL) << 18 | (ura & 0xFUL) << 14 | (svhlth & 0x3FUL) << 8 | (iodc >> 8 & 0x3UL) << 6;
     sbf[0][3] = 0UL;
     sbf[0][4] = 0UL;
     sbf[0][5] = 0UL;
@@ -483,6 +431,16 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[0][7] = (iodc & 0xFFUL) << 22 | (toc & 0xFFFFUL) << 6;
     sbf[0][8] = (af2 & 0xFFUL) << 22 | (af1 & 0xFFFFUL) << 6;
     sbf[0][9] = (af0 & 0x3FFFFFUL) << 8;
+
+    const unsigned long iode   = static_cast<unsigned long>(eph.iode);
+    const long          crs    = static_cast<long>(eph.crs / POW2_M5);
+    const long          deltan = static_cast<long>(eph.deltan / POW2_M43 / PI);
+    const long          m0     = static_cast<long>(eph.m0 / POW2_M31 / PI);
+    const long          cuc    = static_cast<long>(eph.cuc / POW2_M29);
+    const unsigned long ecc    = static_cast<unsigned long>(eph.ecc / POW2_M33);
+    const long          cus    = static_cast<long>(eph.cus / POW2_M29);
+    const unsigned long sqrta  = static_cast<unsigned long>(eph.sqrta / POW2_M19);
+    const unsigned long toe    = static_cast<unsigned long>(eph.toe.sec / 16.0);
 
     // Subframe 2
     sbf[1][0] = 0x8B0000UL << 6;
@@ -496,6 +454,15 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[1][8] = (sqrta & 0xFFFFFFUL) << 6;
     sbf[1][9] = (toe & 0xFFFFUL) << 14;
 
+    const long cic    = static_cast<long>(eph.cic / POW2_M29);
+    const long cis    = static_cast<long>(eph.cis / POW2_M29);
+    const long omg0   = static_cast<long>(eph.omg0 / POW2_M31 / PI);
+    const long inc0   = static_cast<long>(eph.inc0 / POW2_M31 / PI);
+    const long crc    = static_cast<long>(eph.crc / POW2_M5);
+    const long aop    = static_cast<long>(eph.aop / POW2_M31 / PI);
+    const long omgdot = static_cast<long>(eph.omgdot / POW2_M43 / PI);
+    const long idot   = static_cast<long>(eph.idot / POW2_M43 / PI);
+
     // Subframe 3
     sbf[2][0] = 0x8B0000UL << 6;
     sbf[2][1] = 0x3UL << 8;
@@ -508,24 +475,56 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
     sbf[2][8] = (omgdot & 0xFFFFFFUL) << 6;
     sbf[2][9] = (iode & 0xFFUL) << 22 | (idot & 0x3FFFUL) << 8;
 
+    constexpr unsigned long data_id = 1UL;
     if (ionoutc.vflg == TRUE) {
+        constexpr unsigned long sbf4_page18_sv_id = 56UL;
+
+        const signed long   alpha0 = static_cast<signed long>(std::round(ionoutc.alpha0 / POW2_M30));
+        const signed long   alpha1 = static_cast<signed long>(std::round(ionoutc.alpha1 / POW2_M27));
+        const signed long   alpha2 = static_cast<signed long>(std::round(ionoutc.alpha2 / POW2_M24));
+        const signed long   alpha3 = static_cast<signed long>(std::round(ionoutc.alpha3 / POW2_M24));
+        const signed long   beta0  = static_cast<signed long>(std::round(ionoutc.beta0 / 2048.0));
+        const signed long   beta1  = static_cast<signed long>(std::round(ionoutc.beta1 / 16384.0));
+        const signed long   beta2  = static_cast<signed long>(std::round(ionoutc.beta2 / 65536.0));
+        const signed long   beta3  = static_cast<signed long>(std::round(ionoutc.beta3 / 65536.0));
+        const signed long   a0     = static_cast<signed long>(std::round(ionoutc.A0 / POW2_M30));
+        const signed long   a1     = static_cast<signed long>(std::round(ionoutc.A1 / POW2_M50));
+        const signed long   dtls   = ionoutc.dtls;
+        const unsigned long tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
+        const unsigned long wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
+
+        // 2016/12/31 (Sat) -> WNlsf = 1929, DN = 7 (http://navigationservices.agi.com/GNSSWeb/)
+        // Days are counted from 1 to 7 (Sunday is 1).
+        unsigned long wnlsf, dtlsf, dn;
+        if (ionoutc.leapen == TRUE) {
+            wnlsf = static_cast<unsigned long>(ionoutc.wnlsf % 256);
+            dn    = static_cast<unsigned long>(ionoutc.dn);
+            dtlsf = static_cast<unsigned long>(ionoutc.dtlsf);
+        } else {
+            wnlsf = 1929 % 256;
+            dn    = 7;
+            dtlsf = 18;
+        }
+
         // Subframe 4, page 18
         sbf[3][0] = 0x8B0000UL << 6;
         sbf[3][1] = 0x4UL << 8;
-        sbf[3][2] = dataId << 28 | sbf4_page18_svId << 22 | (alpha0 & 0xFFUL) << 14 | (alpha1 & 0xFFUL) << 6;
+        sbf[3][2] = data_id << 28 | sbf4_page18_sv_id << 22 | (alpha0 & 0xFFUL) << 14 | (alpha1 & 0xFFUL) << 6;
         sbf[3][3] = (alpha2 & 0xFFUL) << 22 | (alpha3 & 0xFFUL) << 14 | (beta0 & 0xFFUL) << 6;
         sbf[3][4] = (beta1 & 0xFFUL) << 22 | (beta2 & 0xFFUL) << 14 | (beta3 & 0xFFUL) << 6;
-        sbf[3][5] = (A1 & 0xFFFFFFUL) << 6;
-        sbf[3][6] = (A0 >> 8 & 0xFFFFFFUL) << 6;
-        sbf[3][7] = (A0 & 0xFFUL) << 22 | (tot & 0xFFUL) << 14 | (wnt & 0xFFUL) << 6;
+        sbf[3][5] = (a1 & 0xFFFFFFUL) << 6;
+        sbf[3][6] = (a0 >> 8 & 0xFFFFFFUL) << 6;
+        sbf[3][7] = (a0 & 0xFFUL) << 22 | (tot & 0xFFUL) << 14 | (wnt & 0xFFUL) << 6;
         sbf[3][8] = (dtls & 0xFFUL) << 22 | (wnlsf & 0xFFUL) << 14 | (dn & 0xFFUL) << 6;
         sbf[3][9] = (dtlsf & 0xFFUL) << 22;
 
     } else {
+        constexpr unsigned long sbf4_page25_sv_id = 63UL;
+
         // Subframe 4, page 25
         sbf[3][0] = 0x8B0000UL << 6;
         sbf[3][1] = 0x4UL << 8;
-        sbf[3][2] = dataId << 28 | sbf4_page25_svId << 22;
+        sbf[3][2] = data_id << 28 | sbf4_page25_sv_id << 22;
         sbf[3][3] = 0UL;
         sbf[3][4] = 0UL;
         sbf[3][5] = 0UL;
@@ -535,10 +534,15 @@ void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_
         sbf[3][9] = 0UL;
     }
 
+    constexpr unsigned long sbf5_page25_sv_id = 51UL;
+
+    const unsigned long wna = static_cast<unsigned long>(eph.toe.week % 256);
+    const unsigned long toa = static_cast<unsigned long>(eph.toe.sec / 4096.0);
+
     // Subframe 5, page 25
     sbf[4][0] = 0x8B0000UL << 6;
     sbf[4][1] = 0x5UL << 8;
-    sbf[4][2] = dataId << 28 | sbf5_page25_svId << 22 | (toa & 0xFFUL) << 14 | (wna & 0xFFUL) << 6;
+    sbf[4][2] = data_id << 28 | sbf5_page25_sv_id << 22 | (toa & 0xFFUL) << 14 | (wna & 0xFFUL) << 6;
     sbf[4][3] = 0UL;
     sbf[4][4] = 0UL;
     sbf[4][5] = 0UL;
