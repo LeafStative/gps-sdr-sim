@@ -404,7 +404,7 @@ void satpos(const ephem_t &eph, const gpstime_t &g, vec3 &pos, vec3 &vel, std::s
  *  \param[in] eph Ephemeris of given SV
  *  \param[out] sbf Array of five sub-frames, 10 long words each
  */
-void eph2sbf(const ephem_t eph, const ionoutc_t ionoutc, unsigned long sbf[5][N_DWORD_SBF]) {
+void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][N_DWORD_SBF]) {
     // FIXED: This has to be the "transmission" week number, not for the ephemeris reference time
     // wn = (unsigned long)(eph.toe.week%1024);
     constexpr unsigned long wn  = 0UL;
@@ -1082,7 +1082,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 
  *  \param[in] g GPS time at time of receiving the signal
  *  \param[in] xyz position of the receiver
  */
-void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t g, const vec3 &xyz) {
+void computeRange(range_t *rho, const ephem_t &eph, ionoutc_t *ionoutc, const gpstime_t g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
     vec3                  pos, vel;
     std::array<double, 2> clk;
@@ -1137,7 +1137,7 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, const gpstime_t
  *  \param[in] rho1 Current range, after \a dt has expired
  *  \param[in dt delta-t (time difference) in seconds
  */
-void computeCodePhase(channel_t *chan, range_t rho1, const double dt) {
+void computeCodePhase(channel_t *chan, const range_t &rho1, const double dt) {
 
     // Pseudorange rate.
     const double rhorate = (rho1.range - chan->rho0.range) / dt;
@@ -1383,7 +1383,7 @@ int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
     return 1;
 }
 
-int checkSatVisibility(ephem_t eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
+int checkSatVisibility(const ephem_t &eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
     double tmat[3][3];
 
     if (eph.vflg != 1) { // Invalid
