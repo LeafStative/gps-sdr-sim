@@ -31,7 +31,7 @@
 namespace ranges = std::ranges;
 
 // clang-format off
-constexpr std::array<int, 512> SIN_TABLE512 {
+constexpr auto SIN_TABLE512 = std::to_array({
        2,   5,   8,  11,  14,  17,  20,  23,  26,  29,  32,  35,  38,  41,  44,  47,
       50,  53,  56,  59,  62,  65,  68,  71,  74,  77,  80,  83,  86,  89,  91,  94,
       97, 100, 103, 105, 108, 111, 114, 116, 119, 122, 125, 127, 130, 132, 135, 138,
@@ -64,9 +64,9 @@ constexpr std::array<int, 512> SIN_TABLE512 {
     -138,-135,-132,-130,-127,-125,-122,-119,-116,-114,-111,-108,-105,-103,-100, -97,
      -94, -91, -89, -86, -83, -80, -77, -74, -71, -68, -65, -62, -59, -56, -53, -50,
      -47, -44, -41, -38, -35, -32, -29, -26, -23, -20, -17, -14, -11,  -8,  -5,  -2
-};
+});
 
-constexpr std::array<int, 512> COS_TABLE512 {
+constexpr auto COS_TABLE512 = std::to_array({
      250, 250, 250, 250, 250, 249, 249, 249, 249, 248, 248, 248, 247, 247, 246, 245,
      245, 244, 244, 243, 242, 241, 241, 240, 239, 238, 237, 236, 235, 234, 233, 232,
      230, 229, 228, 227, 225, 224, 223, 221, 220, 218, 217, 215, 214, 212, 210, 209,
@@ -99,15 +99,15 @@ constexpr std::array<int, 512> COS_TABLE512 {
      209, 210, 212, 214, 215, 217, 218, 220, 221, 223, 224, 225, 227, 228, 229, 230,
      232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 241, 242, 243, 244, 244, 245,
      245, 246, 247, 247, 248, 248, 248, 249, 249, 249, 249, 250, 250, 250, 250, 250
-};
+});
 
 // Receiver antenna attenuation in dB for boresight angle = 0:5:180 [deg]
-constexpr std::array<double, 37> ANT_PAT_DB {
+constexpr auto ANT_PAT_DB = std::to_array({
      0.00,  0.00,  0.22,  0.44,  0.67,  1.11,  1.56,  2.00,  2.44,  2.89,  3.56,  4.22,
      4.89,  5.56,  6.22,  6.89,  7.56,  8.22,  8.89,  9.78, 10.67, 11.56, 12.44, 13.33,
     14.44, 15.56, 16.67, 17.78, 18.89, 20.00, 21.33, 22.67, 24.00, 25.56, 27.33, 29.33,
     31.56
-};
+});
 // clang-format on
 
 namespace {
@@ -158,7 +158,7 @@ void codegen(int *ca, const int prn) {
  *  \return g output date in GPS form
  */
 gpstime_t date2gps(const datetime_t &t) {
-    constexpr std::array<int, 12> doy{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    constexpr auto doy = std::to_array({0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334});
 
     const int year = t.y - 1980;
 
@@ -582,7 +582,7 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
     D30    00 1011 0111 1010 1000 1001 1100 0000
     */
 
-    constexpr std::array<uint32_t, 6> b_mask{0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL};
+    constexpr auto b_mask = std::to_array({0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL});
 
     unsigned long       d   = source & 0x3FFFFFC0UL;
     const unsigned long d29 = source >> 31 & 0x1UL;
