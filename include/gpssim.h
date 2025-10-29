@@ -128,7 +128,7 @@ struct ephem_t {
 
 struct ionoutc_t {
     bool   enable;
-    bool   vflag;
+    bool   valid;
     bool   leapen; // enable custom leap event
     int    dtls;
     int    tot;

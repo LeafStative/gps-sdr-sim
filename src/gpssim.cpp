@@ -478,7 +478,7 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
     sbf[2][9] = (iode & 0xFFUL) << 22 | (idot & 0x3FFFUL) << 8;
 
     constexpr unsigned long data_id = 1UL;
-    if (ionoutc.vflag) {
+    if (ionoutc.valid) {
         constexpr unsigned long sbf4_page18_sv_id = 56UL;
 
         const signed long   alpha0 = static_cast<signed long>(std::round(ionoutc.alpha0 / POW2_M30));
@@ -712,7 +712,7 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
     }
 
     // true if read all Iono/UTC lines
-    ionoutc.vflag = flags == 0xF;
+    ionoutc.valid = flags == 0xF;
 
     // Read ephemeris blocks
     gpstime_t g0{.week = -1, .sec = 0};
@@ -867,7 +867,7 @@ double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 
     const double F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
 
     double iono_delay;
-    if (!ionoutc->vflag) {
+    if (!ionoutc->valid) {
         iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
     } else {
         // Earth's central angle between the user position and the earth projection of
@@ -1647,7 +1647,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (verb == TRUE && ionoutc.vflag) {
+    if (verb == TRUE && ionoutc.valid) {
         std::cerr << std::format(
             "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
         std::cerr << std::format(
@@ -1694,7 +1694,7 @@ int main(int argc, char *argv[]) {
             ionoutc.tot = static_cast<int>(gtmp.sec);
 
             // Iono/UTC parameters may no longer valid
-            // ionoutc.vflag = FALSE;
+            // ionoutc.valid = FALSE;
 
             // Overwrite the TOC and TOE to the scenario start time
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
