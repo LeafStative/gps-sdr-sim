@@ -660,9 +660,9 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
     }
 
     // Clear valid flag
-    for (size_t ieph = 0; ieph < EPHEM_ARRAY_SIZE; ieph++) {
-        for (size_t sv = 0; sv < MAX_SAT; sv++) {
-            eph[ieph][sv].vflg = 0;
+    for (size_t ieph = 0; ieph < EPHEM_ARRAY_SIZE; ++ieph) {
+        for (size_t sv = 0; sv < MAX_SAT; ++sv) {
+            eph[ieph][sv].valid = false;
         }
     }
 
@@ -840,7 +840,7 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
         }
 
         // Set valid flag
-        ephem.vflg = 1;
+        ephem.valid = true;
 
         // Update the working variables
         ephem.A       = ephem.sqrta * ephem.sqrta;
@@ -1239,7 +1239,7 @@ int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
 int checkSatVisibility(const ephem_t &eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
     double tmat[3][3];
 
-    if (eph.vflg != 1) { // Invalid
+    if (!eph.valid) { // Invalid
         return -1;
     }
 
@@ -1657,7 +1657,7 @@ int main(int argc, char *argv[]) {
     }
 
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        if (eph[0][sv].vflg == 1) {
+        if (eph[0][sv].valid) {
             gmin = eph[0][sv].toc;
             tmin = eph[0][sv].t;
             break;
@@ -1673,7 +1673,7 @@ int main(int argc, char *argv[]) {
     tmax.m    = 0;
     tmax.y    = 0;
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        if (eph[neph - 1][sv].vflg == 1) {
+        if (eph[neph - 1][sv].valid) {
             gmax = eph[neph - 1][sv].toc;
             tmax = eph[neph - 1][sv].t;
             break;
@@ -1699,7 +1699,7 @@ int main(int argc, char *argv[]) {
             // Overwrite the TOC and TOE to the scenario start time
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
                 for (int i = 0; i < neph; i++) {
-                    if (eph[i][sv].vflg == 1) {
+                    if (eph[i][sv].valid) {
                         gtmp             = eph[i][sv].toc + d_sec;
                         const auto t_tmp = gps2date(gtmp);
                         eph[i][sv].toc   = gtmp;
@@ -1758,7 +1758,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < neph; i++) {
         for (size_t sv = 0; sv < MAX_SAT; sv++) {
-            if (eph[i][sv].vflg == 1) {
+            if (eph[i][sv].valid) {
                 dt = g0 - eph[i][sv].toc;
                 if (dt >= -SECONDS_IN_HOUR && dt < SECONDS_IN_HOUR) {
                     ieph = i;
@@ -2005,7 +2005,7 @@ int main(int argc, char *argv[]) {
             // Refresh ephemeris and subframes
             // Quick and dirty fix. Need more elegant way.
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
-                if (eph[ieph + 1][sv].vflg == 1) {
+                if (eph[ieph + 1][sv].valid) {
                     dt = eph[ieph + 1][sv].toc - grx;
                     if (dt < SECONDS_IN_HOUR) {
                         ieph++;
