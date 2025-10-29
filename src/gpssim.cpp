@@ -645,34 +645,6 @@ void replace_exp_designator(std::string &str) {
     ranges::replace(str, 'D', 'E');
 }
 
-double subGpsTime(const gpstime_t g1, const gpstime_t g0) {
-    double dt = g1.sec - g0.sec;
-    dt += static_cast<double>(g1.week - g0.week) * SECONDS_IN_WEEK;
-
-    return dt;
-}
-
-gpstime_t incGpsTime(const gpstime_t g0, const double dt) {
-    gpstime_t g1;
-
-    g1.week = g0.week;
-    g1.sec  = g0.sec + dt;
-
-    g1.sec = round(g1.sec * 1000.0) / 1000.0; // Avoid rounding error
-
-    while (g1.sec >= SECONDS_IN_WEEK) {
-        g1.sec -= SECONDS_IN_WEEK;
-        g1.week++;
-    }
-
-    while (g1.sec < 0.0) {
-        g1.sec += SECONDS_IN_WEEK;
-        g1.week--;
-    }
-
-    return g1;
-}
-
 /*! \brief Read Ephemeris data from the RINEX Navigation file */
 /*  \param[out] eph Array of Output SV ephemeris data
  *  \param[in] fname File name of the RINEX file
@@ -824,13 +796,13 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         }
 
         // Check current time of clock
-        const double dt = subGpsTime(g, g0);
-
-        if (dt > SECONDS_IN_HOUR) {
+        if (const double dt = g - g0; dt > SECONDS_IN_HOUR) {
             g0 = g;
             ieph++; // a new set of ephemerides
 
-            if (ieph >= EPHEM_ARRAY_SIZE) break;
+            if (ieph >= EPHEM_ARRAY_SIZE) {
+                break;
+            }
         }
 
         // Date and time
@@ -1147,7 +1119,7 @@ void computeCodePhase(channel_t *chan, const range_t &rho1, const double dt) {
     chan->f_code = CODE_FREQ + chan->f_carr * CARR_TO_CODE;
 
     // Initial code phase and data bit counters.
-    const double ms = (subGpsTime(chan->rho0.g, chan->g0) + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
+    const double ms = (chan->rho0.g - chan->g0 + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
 
     int ims          = static_cast<int>(ms);
     chan->code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
@@ -1834,7 +1806,7 @@ int main(int argc, char *argv[]) {
             gtmp.week = g0.week;
             gtmp.sec  = static_cast<double>(static_cast<int>(g0.sec) / 7200) * 7200.0;
 
-            const auto d_sec = subGpsTime(gtmp, gmin);
+            const auto d_sec = gtmp - gmin;
 
             // Overwrite the UTC reference week number
             ionoutc.wnt = gtmp.week;
@@ -1847,18 +1819,18 @@ int main(int argc, char *argv[]) {
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
                 for (int i = 0; i < neph; i++) {
                     if (eph[i][sv].vflg == 1) {
-                        gtmp             = incGpsTime(eph[i][sv].toc, d_sec);
+                        gtmp             = eph[i][sv].toc + d_sec;
                         const auto t_tmp = gps2date(gtmp);
                         eph[i][sv].toc   = gtmp;
                         eph[i][sv].t     = t_tmp;
 
-                        gtmp           = incGpsTime(eph[i][sv].toe, d_sec);
+                        gtmp           = eph[i][sv].toe + d_sec;
                         eph[i][sv].toe = gtmp;
                     }
                 }
             }
         } else {
-            if (subGpsTime(g0, gmin) < 0.0 || subGpsTime(gmax, g0) < 0.0) {
+            if (g0 - gmin < 0.0 || gmax - g0 < 0.0) {
                 std::cerr << "ERROR: Invalid start time.\n";
                 std::cerr << std::format(
                     "tmin = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
@@ -1906,7 +1878,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < neph; i++) {
         for (size_t sv = 0; sv < MAX_SAT; sv++) {
             if (eph[i][sv].vflg == 1) {
-                dt = subGpsTime(g0, eph[i][sv].toc);
+                dt = g0 - eph[i][sv].toc;
                 if (dt >= -SECONDS_IN_HOUR && dt < SECONDS_IN_HOUR) {
                     ieph = i;
                     break;
@@ -1977,7 +1949,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Initial reception time
-    grx = incGpsTime(g0, 0.0);
+    grx = g0 + 0.0;
 
     // Allocate visible satellites
     allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
@@ -2008,7 +1980,7 @@ int main(int argc, char *argv[]) {
     clock_t tstart = clock();
 
     // Update receiver time
-    grx = incGpsTime(grx, 0.1);
+    grx += 0.1;
 
     for (iumd = 1; iumd < numd; iumd++) {
         for (int i = 0; i < MAX_CHAN; i++) {
@@ -2153,7 +2125,7 @@ int main(int argc, char *argv[]) {
             // Quick and dirty fix. Need more elegant way.
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
                 if (eph[ieph + 1][sv].vflg == 1) {
-                    dt = subGpsTime(eph[ieph + 1][sv].toc, grx);
+                    dt = eph[ieph + 1][sv].toc - grx;
                     if (dt < SECONDS_IN_HOUR) {
                         ieph++;
 
@@ -2191,10 +2163,10 @@ int main(int argc, char *argv[]) {
         }
 
         // Update receiver time
-        grx = incGpsTime(grx, 0.1);
+        grx += 0.1;
 
         // Update time counter
-        std::cerr << std::format("\rTime into run = {:4.1f}", subGpsTime(grx, g0));
+        std::cerr << std::format("\rTime into run = {:4.1f}", grx - g0);
         fflush(stdout);
     }
 

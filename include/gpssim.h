@@ -5,6 +5,8 @@
 
 #include <numbers>
 
+#include "gpstime.h"
+
 // #define FLOAT_CARR_PHASE // For RKT simulation. Higher computational load, but smoother carrier phase.
 
 #define TRUE (1)
@@ -38,12 +40,6 @@ constexpr auto N_DWORD = (N_SBF + 1) * N_DWORD_SBF; // Subframe word buffer size
 
 /*! \brief C/A code sequence length */
 constexpr size_t CA_SEQ_LEN = 1023;
-
-constexpr auto SECONDS_IN_WEEK      = 604800.0;
-constexpr auto SECONDS_IN_HALF_WEEK = 302400.0;
-constexpr auto SECONDS_IN_DAY       = 86400.0;
-constexpr auto SECONDS_IN_HOUR      = 3600.0;
-constexpr auto SECONDS_IN_MINUTE    = 60.0;
 
 constexpr auto POW2_M5  = 0.03125;
 constexpr auto POW2_M19 = 1.907348632812500e-6;
@@ -83,12 +79,6 @@ constexpr auto SC08 = 8;
 constexpr auto SC16 = 16;
 
 constexpr auto EPHEM_ARRAY_SIZE = 15; // for daily GPS broadcast ephemers file (brdc)
-
-/*! \brief Structure representing GPS time */
-struct gpstime_t {
-    int    week; /*!< GPS week number (since January 1980) */
-    double sec;  /*!< second inside the GPS \a week */
-};
 
 /*! \brief Structure repreenting UTC time */
 struct datetime_t {
