@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <bitset>
 #include <charconv>
 #include <format>
 #include <fstream>
@@ -667,7 +668,7 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
     }
 
     // Read header lines
-    int flags = 0x0;
+    std::bitset<4> flags{0b0000};
     while (true) {
         std::string line;
         if (!std::getline(fs, line)) {
@@ -687,14 +688,14 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
 
             // read wntlsf, dn, and dtlsf from file
 
-            flags |= 0x1;
+            flags.set(0);
         } else if (str.substr(60, 8) == "ION BETA") {
             from_chars_rinex(str.substr(2, 12), ionoutc.beta0);
             from_chars_rinex(str.substr(14, 12), ionoutc.beta1);
             from_chars_rinex(str.substr(26, 12), ionoutc.beta2);
             from_chars_rinex(str.substr(38, 12), ionoutc.beta3);
 
-            flags |= 0x1 << 1;
+            flags.set(1);
         } else if (str.substr(60, 9) == "DELTA-UTC") {
             from_chars_rinex(str.substr(3, 19), ionoutc.a0);
             from_chars_rinex(str.substr(22, 19), ionoutc.a1);
@@ -702,17 +703,17 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
             from_chars_rinex(str.substr(50, 9), ionoutc.wnt);
 
             if (ionoutc.tot % 4096 == 0) {
-                flags |= 0x1 << 2;
+                flags.set(2);
             }
         } else if (str.substr(60, 12) == "LEAP SECONDS") {
             from_chars_rinex(str.substr(0, 6), ionoutc.dtls);
 
-            flags |= 0x1 << 3;
+            flags.set(3);
         }
     }
 
     // true if read all Iono/UTC lines
-    ionoutc.valid = flags == 0xF;
+    ionoutc.valid = flags.all();
 
     // Read ephemeris blocks
     gpstime_t g0{.week = -1, .sec = 0};
