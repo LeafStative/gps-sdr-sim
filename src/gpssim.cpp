@@ -16,6 +16,7 @@
 #include <ranges>
 #include <span>
 #include <string>
+#include <type_traits>
 
 #include <scn/scan.h>
 
@@ -29,6 +30,9 @@
 #include "vec3.h"
 
 namespace ranges = std::ranges;
+namespace views  = std::views;
+
+namespace {
 
 // clang-format off
 constexpr auto SIN_TABLE512 = std::to_array({
@@ -109,8 +113,6 @@ constexpr auto ANT_PAT_DB = std::to_array({
     31.56
 });
 // clang-format on
-
-namespace {
 
 std::array<int, MAX_SAT>           allocated_sat;
 std::array<vec3, USER_MOTION_SIZE> xyz;
@@ -620,29 +622,30 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
     return result;
 }
 
-/*! \brief Replace all 'E' exponential designators to 'D'
- *  \param str String in which all occurrences of 'E' are replaced with 'D'
- *  \param len Length of input string in bytes
- *  \returns Number of characters replaced
- */
-int replaceExpDesignator(char *str, const int len) {
-    int n = 0;
+template <typename ParseT = void, typename VarT>
+requires(std::is_arithmetic_v<ParseT> || std::is_same_v<ParseT, void>) && std::is_arithmetic_v<VarT>
+std::from_chars_result from_chars_rinex(std::string_view str, VarT &value) {
+    constexpr auto predicate = [](const auto c) { return !std::isblank(c); };
 
-    for (int i = 0; i < len; i++) {
-        if (str[i] == 'D') {
-            n++;
-            str[i] = 'E';
-        }
+    const auto start = ranges::find_if(str, predicate);
+    str.remove_prefix(std::distance(str.begin(), start));
+
+    const auto end = ranges::find_if(views::reverse(str), predicate);
+    str.remove_suffix(std::distance(end.base(), str.end()));
+
+    std::string tmp;
+    tmp.reserve(str.size());
+    ranges::replace_copy(str, std::back_inserter(tmp), 'D', 'E');
+
+    if constexpr (std::is_same_v<ParseT, void> || std::is_same_v<ParseT, VarT>) {
+        return std::from_chars(tmp.c_str(), tmp.c_str() + tmp.size(), value);
+    } else {
+        ParseT     tmp_value;
+        const auto result = std::from_chars(tmp.c_str(), tmp.c_str() + tmp.size(), tmp_value);
+        value             = static_cast<VarT>(tmp_value);
+
+        return result;
     }
-
-    return n;
-}
-
-/*! \brief Replace all 'E' exponential designators to 'D'
- *  \param str String in which all occurrences of 'E' are replaced with 'D'
- */
-void replace_exp_designator(std::string &str) {
-    ranges::replace(str, 'D', 'E');
 }
 
 /*! \brief Read Ephemeris data from the RINEX Navigation file */
@@ -650,9 +653,9 @@ void replace_exp_designator(std::string &str) {
  *  \param[in] fname File name of the RINEX file
  *  \returns Number of sets of ephemerides in the file
  */
-int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fname) {
-    FILE *fp = fopen(fname, "rt");
-    if (fp == nullptr) {
+int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *fname) {
+    std::ifstream fs{fname};
+    if (!fs.is_open()) {
         return -1;
     }
 
@@ -664,133 +667,80 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
     }
 
     // Read header lines
-    char str[MAX_CHAR];
-    char tmp[20];
-    int  flags = 0x0;
+    int flags = 0x0;
     while (true) {
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        std::string line;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        const std::string_view str = line;
 
-        if (strncmp(str + 60, "END OF HEADER", 13) == 0) break;
-        if (strncmp(str + 60, "ION ALPHA", 9) == 0) {
-            strncpy(tmp, str + 2, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->alpha0 = atof(tmp);
+        if (str.substr(60, 13) == "END OF HEADER") {
+            break;
+        }
 
-            strncpy(tmp, str + 14, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->alpha1 = atof(tmp);
+        if (str.substr(60, 9) == "ION ALPHA") {
+            from_chars_rinex(str.substr(2, 12), ionoutc.alpha0);
+            from_chars_rinex(str.substr(14, 12), ionoutc.alpha1);
+            from_chars_rinex(str.substr(26, 12), ionoutc.alpha2);
+            from_chars_rinex(str.substr(38, 12), ionoutc.alpha3);
 
-            strncpy(tmp, str + 26, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->alpha2 = atof(tmp);
-
-            strncpy(tmp, str + 38, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->alpha3 = atof(tmp);
-
-            // read wntlsf, dn, and dtlsf from fil
+            // read wntlsf, dn, and dtlsf from file
 
             flags |= 0x1;
-        } else if (strncmp(str + 60, "ION BETA", 8) == 0) {
-            strncpy(tmp, str + 2, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->beta0 = atof(tmp);
-
-            strncpy(tmp, str + 14, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->beta1 = atof(tmp);
-
-            strncpy(tmp, str + 26, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->beta2 = atof(tmp);
-
-            strncpy(tmp, str + 38, 12);
-            tmp[12] = 0;
-            replaceExpDesignator(tmp, 12);
-            ionoutc->beta3 = atof(tmp);
+        } else if (str.substr(60, 8) == "ION BETA") {
+            from_chars_rinex(str.substr(2, 12), ionoutc.beta0);
+            from_chars_rinex(str.substr(14, 12), ionoutc.beta1);
+            from_chars_rinex(str.substr(26, 12), ionoutc.beta2);
+            from_chars_rinex(str.substr(38, 12), ionoutc.beta3);
 
             flags |= 0x1 << 1;
-        } else if (strncmp(str + 60, "DELTA-UTC", 9) == 0) {
-            strncpy(tmp, str + 3, 19);
-            tmp[19] = 0;
-            replaceExpDesignator(tmp, 19);
-            ionoutc->a0 = atof(tmp);
+        } else if (str.substr(60, 9) == "DELTA-UTC") {
+            from_chars_rinex(str.substr(3, 19), ionoutc.a0);
+            from_chars_rinex(str.substr(22, 19), ionoutc.a1);
+            from_chars_rinex(str.substr(41, 9), ionoutc.tot);
+            from_chars_rinex(str.substr(50, 9), ionoutc.wnt);
 
-            strncpy(tmp, str + 22, 19);
-            tmp[19] = 0;
-            replaceExpDesignator(tmp, 19);
-            ionoutc->a1 = atof(tmp);
-
-            strncpy(tmp, str + 41, 9);
-            tmp[9]       = 0;
-            ionoutc->tot = atoi(tmp);
-
-            strncpy(tmp, str + 50, 9);
-            tmp[9]       = 0;
-            ionoutc->wnt = atoi(tmp);
-
-            if (ionoutc->tot % 4096 == 0) flags |= 0x1 << 2;
-        } else if (strncmp(str + 60, "LEAP SECONDS", 12) == 0) {
-            strncpy(tmp, str, 6);
-            tmp[6]        = 0;
-            ionoutc->dtls = atoi(tmp);
+            if (ionoutc.tot % 4096 == 0) {
+                flags |= 0x1 << 2;
+            }
+        } else if (str.substr(60, 12) == "LEAP SECONDS") {
+            from_chars_rinex(str.substr(0, 6), ionoutc.dtls);
 
             flags |= 0x1 << 3;
         }
     }
 
-    ionoutc->vflag = false;
-    if (flags == 0xF) { // Read all Iono/UTC lines
-        ionoutc->vflag = true;
-    }
+    // true if read all Iono/UTC lines
+    ionoutc.vflag = flags == 0xF;
 
     // Read ephemeris blocks
-    gpstime_t g0;
-    g0.week     = -1;
-    size_t ieph = 0;
+    gpstime_t g0{.week = -1, .sec = 0};
+    size_t    ieph = 0;
     while (true) {
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        std::string line;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        std::string_view str = line;
 
         // PRN
-        strncpy(tmp, str, 2);
-        tmp[2]    = 0;
-        size_t sv = atoi(tmp) - 1;
+        size_t sv;
+        from_chars_rinex(str.substr(0, 2), sv);
+        sv -= 1;
 
         // EPOCH
-        strncpy(tmp, str + 3, 2);
-        tmp[2] = 0;
         datetime_t t;
-        t.y = atoi(tmp) + 2000;
+        from_chars_rinex(str.substr(3, 2), t.y);
+        from_chars_rinex(str.substr(6, 2), t.m);
+        from_chars_rinex(str.substr(9, 2), t.d);
+        from_chars_rinex(str.substr(12, 2), t.hh);
+        from_chars_rinex(str.substr(15, 2), t.mm);
+        from_chars_rinex(str.substr(18, 4), t.sec);
 
-        strncpy(tmp, str + 6, 2);
-        tmp[2] = 0;
-        t.m    = atoi(tmp);
-
-        strncpy(tmp, str + 9, 2);
-        tmp[2] = 0;
-        t.d    = atoi(tmp);
-
-        strncpy(tmp, str + 12, 2);
-        tmp[2] = 0;
-        t.hh   = atoi(tmp);
-
-        strncpy(tmp, str + 15, 2);
-        tmp[2] = 0;
-        t.mm   = atoi(tmp);
-
-        strncpy(tmp, str + 18, 4);
-        tmp[2] = 0;
-        t.sec  = atof(tmp);
+        t.y += 2000;
 
         const auto g = date2gps(t);
-
         if (g0.week == -1) {
             g0 = g;
         }
@@ -798,179 +748,110 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
         // Check current time of clock
         if (const double dt = g - g0; dt > SECONDS_IN_HOUR) {
             g0 = g;
-            ieph++; // a new set of ephemerides
+            ++ieph; // a new set of ephemerides
 
             if (ieph >= EPHEM_ARRAY_SIZE) {
                 break;
             }
         }
 
+        auto &ephem = eph[ieph][sv];
         // Date and time
-        eph[ieph][sv].t = t;
+        ephem.t = t;
 
         // SV CLK
-        eph[ieph][sv].toc = g;
+        ephem.toc = g;
 
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19); // tmp[15]='E';
-        eph[ieph][sv].af0 = atof(tmp);
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].af1 = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].af2 = atof(tmp);
+        from_chars_rinex(str.substr(22, 19), ephem.af0);
+        from_chars_rinex(str.substr(41, 19), ephem.af1);
+        from_chars_rinex(str.substr(60, 19), ephem.af2);
 
         // BROADCAST ORBIT - 1
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 3, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].iode = static_cast<int>(atof(tmp));
-
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].crs = atof(tmp);
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].deltan = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].m0 = atof(tmp);
+        from_chars_rinex<double>(str.substr(3, 19), ephem.iode);
+        from_chars_rinex(str.substr(22, 19), ephem.crs);
+        from_chars_rinex(str.substr(41, 19), ephem.deltan);
+        from_chars_rinex(str.substr(60, 19), ephem.m0);
 
         // BROADCAST ORBIT - 2
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 3, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].cuc = atof(tmp);
-
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].ecc = atof(tmp);
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].cus = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].sqrta = atof(tmp);
+        from_chars_rinex(str.substr(3, 19), ephem.cuc);
+        from_chars_rinex(str.substr(22, 19), ephem.ecc);
+        from_chars_rinex(str.substr(41, 19), ephem.cus);
+        from_chars_rinex(str.substr(60, 19), ephem.sqrta);
 
         // BROADCAST ORBIT - 3
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 3, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].toe.sec = atof(tmp);
-
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].cic = atof(tmp);
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].omg0 = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].cis = atof(tmp);
+        from_chars_rinex(str.substr(3, 19), ephem.toe.sec);
+        from_chars_rinex(str.substr(22, 19), ephem.cic);
+        from_chars_rinex(str.substr(41, 19), ephem.omg0);
+        from_chars_rinex(str.substr(60, 19), ephem.cis);
 
         // BROADCAST ORBIT - 4
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 3, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].inc0 = atof(tmp);
-
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].crc = atof(tmp);
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].aop = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].omgdot = atof(tmp);
+        from_chars_rinex(str.substr(3, 19), ephem.inc0);
+        from_chars_rinex(str.substr(22, 19), ephem.crc);
+        from_chars_rinex(str.substr(41, 19), ephem.aop);
+        from_chars_rinex(str.substr(60, 19), ephem.omgdot);
 
         // BROADCAST ORBIT - 5
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 3, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].idot = atof(tmp);
-
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].codeL2 = static_cast<int>(atof(tmp));
-
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].toe.week = static_cast<int>(atof(tmp));
+        from_chars_rinex(str.substr(3, 19), ephem.idot);
+        from_chars_rinex<double>(str.substr(22, 19), ephem.codeL2);
+        from_chars_rinex<double>(str.substr(41, 19), ephem.toe.week);
 
         // BROADCAST ORBIT - 6
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
+        str = line;
 
-        strncpy(tmp, str + 22, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].svhlth = static_cast<int>(atof(tmp));
-        if (eph[ieph][sv].svhlth > 0 && eph[ieph][sv].svhlth < 32) eph[ieph][sv].svhlth += 32; // Set MSB to 1
+        from_chars_rinex<double>(str.substr(22, 19), ephem.svhlth);
+        from_chars_rinex(str.substr(41, 19), ephem.tgd);
+        from_chars_rinex<double>(str.substr(60, 19), ephem.iodc);
 
-        strncpy(tmp, str + 41, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].tgd = atof(tmp);
-
-        strncpy(tmp, str + 60, 19);
-        tmp[19] = 0;
-        replaceExpDesignator(tmp, 19);
-        eph[ieph][sv].iodc = static_cast<int>(atof(tmp));
+        if (ephem.svhlth > 0 && ephem.svhlth < 32) { // Set MSB to 1
+            ephem.svhlth += 32;
+        }
 
         // BROADCAST ORBIT - 7
-        if (nullptr == fgets(str, MAX_CHAR, fp)) break;
+        if (!std::getline(fs, line)) {
+            break;
+        }
 
         // Set valid flag
-        eph[ieph][sv].vflg = 1;
+        ephem.vflg = 1;
 
         // Update the working variables
-        eph[ieph][sv].A       = eph[ieph][sv].sqrta * eph[ieph][sv].sqrta;
-        eph[ieph][sv].n       = sqrt(GM_EARTH / (eph[ieph][sv].A * eph[ieph][sv].A * eph[ieph][sv].A)) + eph[ieph][sv].deltan;
-        eph[ieph][sv].sq1e2   = sqrt(1.0 - eph[ieph][sv].ecc * eph[ieph][sv].ecc);
-        eph[ieph][sv].omgkdot = eph[ieph][sv].omgdot - OMEGA_EARTH;
+        ephem.A       = ephem.sqrta * ephem.sqrta;
+        ephem.n       = sqrt(GM_EARTH / (ephem.A * ephem.A * ephem.A)) + ephem.deltan;
+        ephem.sq1e2   = sqrt(1.0 - ephem.ecc * ephem.ecc);
+        ephem.omgkdot = ephem.omgdot - OMEGA_EARTH;
     }
 
-    fclose(fp);
-
-    if (g0.week >= 0) ieph += 1; // Number of sets of ephemerides
+    if (g0.week >= 0) { // Number of sets of ephemerides
+        ++ieph;
+    }
 
     return ieph;
 }
@@ -1754,7 +1635,7 @@ int main(int argc, char *argv[]) {
     // Read ephemeris
     ////////////////////////////////////////////////////////////
 
-    int neph = readRinexNavAll(eph, &ionoutc, navfile);
+    int neph = read_rinex_nav_all(eph, ionoutc, navfile);
 
     if (neph == 0) {
         std::cerr << "ERROR: No ephemeris available.\n";
