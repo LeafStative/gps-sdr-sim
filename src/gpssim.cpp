@@ -1,6 +1,5 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -627,7 +626,7 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
 template <typename ParseT = void, typename VarT>
 requires(std::is_arithmetic_v<ParseT> || std::is_same_v<ParseT, void>) && std::is_arithmetic_v<VarT>
 std::from_chars_result from_chars_rinex(std::string_view str, VarT &value) {
-    constexpr auto predicate = [](const auto c) { return !std::isblank(c); };
+    constexpr auto predicate = [](const auto c) { return !std::isspace(c); };
 
     const auto start = ranges::find_if(str, predicate);
     str.remove_prefix(std::distance(str.begin(), start));
