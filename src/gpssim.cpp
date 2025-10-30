@@ -18,6 +18,7 @@
 #include <span>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include <scn/scan.h>
 
@@ -649,6 +650,12 @@ std::from_chars_result from_chars_rinex(std::string_view str, VarT &value) {
     }
 }
 
+template <typename T>
+requires std::is_arithmetic_v<T>
+auto from_chars(const std::string_view str, T &value) {
+    return std::from_chars(str.data(), str.data() + str.size(), value);
+}
+
 /*! \brief Read Ephemeris data from the RINEX Navigation file */
 /*  \param[out] eph Array of Output SV ephemeris data
  *  \param[in] fname File name of the RINEX file
@@ -1075,72 +1082,82 @@ int read_user_motion_llh(const std::span<vec3, USER_MOTION_SIZE> output, const s
     return USER_MOTION_SIZE;
 }
 
-int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
-    FILE *fp;
-    int   numd = 0;
-    char  str[MAX_CHAR];
-    vec3  llh;
-    char  tmp[8];
+std::vector<std::string> string_split(const std::string &s, char delimiter) {
+    std::vector<std::string> result;
 
-    if (nullptr == (fp = fopen(filename, "rt"))) return -1;
+    for (auto subrange : s | views::split(delimiter)) {
+        result.emplace_back(subrange.begin(), subrange.end());
+    }
 
-    while (true) {
-        if (fgets(str, MAX_CHAR, fp) == nullptr) break;
+    return result;
+}
 
-        const char *token = strtok(str, ",");
+int read_nmea_gga(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
+    std::ifstream fs{filename};
+    if (!fs.is_open()) {
+        return -1;
+    }
 
-        if (strncmp(token + 3, "GGA", 3) == 0) {
-            token = strtok(nullptr, ","); // Date and time
+    std::string line;
+    for (int numd = 0; numd < USER_MOTION_SIZE; ++numd) {
+        if (!std::getline(fs, line)) {
+            return numd;
+        }
 
-            token = strtok(nullptr, ","); // Latitude
-            strncpy(tmp, token, 2);
-            tmp[2] = 0;
+        const auto elements = string_split(line, ',');
+        if (elements.size() != 15) {
+            return 0;
+        }
+        auto it = elements.begin();
 
-            llh.x = atof(tmp) + atof(token + 2) / 60.0;
+        if (std::string_view token = *it++; token.substr(3, 3) == "GGA") {
+            token = *it++; // Date and time
 
-            token = strtok(nullptr, ","); // North or south
-            if (token[0] == 'S') llh.x *= -1.0;
+            token = *it++; // Latitude
+            vec3   llh;
+            double temp;
+            from_chars(token.substr(0, 2), temp);
+            from_chars(token.substr(2), llh.x);
+            llh.x = temp + llh.x / 60.0;
+
+            token = *it++; // North or south
+            if (token == "S") {
+                llh.x *= -1.0;
+            }
 
             llh.x /= R2D; // in radian
 
-            token = strtok(nullptr, ","); // Longitude
-            strncpy(tmp, token, 3);
-            tmp[3] = 0;
+            token = *it++; // Longitude
+            from_chars(token.substr(0, 3), temp);
+            from_chars(token.substr(3), llh.y);
+            llh.y = temp + llh.y / 60.0;
 
-            llh.y = atof(tmp) + atof(token + 3) / 60.0;
-
-            token = strtok(nullptr, ","); // East or west
-            if (token[0] == 'W') llh.y *= -1.0;
+            token = *it++; // East or west
+            if (token == "W") {
+                llh.y *= -1.0;
+            }
 
             llh.y /= R2D; // in radian
 
-            token = strtok(nullptr, ","); // GPS fix
-            token = strtok(nullptr, ","); // Number of satellites
-            token = strtok(nullptr, ","); // HDOP
+            token = *it++; // GPS fix
+            token = *it++; // Number of satellites
+            token = *it++; // HDOP
 
-            token = strtok(nullptr, ","); // Altitude above meas sea level
+            token = *it++; // Altitude above meas sea level
+            from_chars(token, llh.z);
 
-            llh.z = atof(token);
+            token = *it++; // in meter
 
-            token = strtok(nullptr, ","); // in meter
-
-            token = strtok(nullptr, ","); // Geoid height above WGS84 ellipsoid
-
-            llh.z += atof(token);
+            token = *it++; // Geoid height above WGS84 ellipsoid
+            from_chars(token, temp);
+            llh.z += temp;
 
             // Convert geodetic position into ECEF coordinates
-            xyz[numd] = llh2xyz(llh);
-
-            // Update the number of track points
-            numd++;
-
-            if (numd >= USER_MOTION_SIZE) break;
+            output[numd] = llh2xyz(llh);
         }
     }
 
-    fclose(fp);
-
-    return numd;
+    return USER_MOTION_SIZE;
 }
 
 int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
@@ -1575,7 +1592,7 @@ int main(int argc, char *argv[]) {
     if (!staticLocationMode) {
         // Read user motion file
         if (nmeaGGA == TRUE) {
-            numd = readNmeaGGA(xyz, umfile);
+            numd = read_nmea_gga(xyz, umfile);
         } else if (umLLH == TRUE) {
             numd = read_user_motion_llh(xyz, umfile);
         } else {
