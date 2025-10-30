@@ -1035,46 +1035,45 @@ int read_user_motion(const std::span<vec3, USER_MOTION_SIZE> output, const std::
 }
 
 /*! \brief Read the list of user motions from the input file
- *  \param[out] xyz Output array of LatLonHei coordinates for user motion
+ *  \param[out] output Output array of LatLonHei coordinates for user motion
  *  \param[in] filename File name of the text input file with format Lat,Lon,Hei
  *  \returns Number of user data motion records read, -1 on error
  *
  * Added by romalvarezllorens@gmail.com
  */
-int readUserMotionLLH(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
-    FILE *fp = fopen(filename, "rt");
-    if (fp == nullptr) {
+int read_user_motion_llh(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
+    std::ifstream fs{filename};
+    if (!fs.is_open()) {
         return -1;
     }
 
-    int  numd;
-    char str[MAX_CHAR];
-    for (numd = 0; numd < USER_MOTION_SIZE; numd++) {
-        if (fgets(str, MAX_CHAR, fp) == nullptr) {
-            break;
+    for (int numd = 0; numd < USER_MOTION_SIZE; ++numd) {
+        std::string line;
+        if (!std::getline(fs, line)) {
+            return numd;
         }
 
-        double t;
-        vec3   llh;
-        if (EOF == sscanf(str, "%lf,%lf,%lf,%lf", &t, &llh.x, &llh.y, &llh.z)) { // Read CSV line
-            break;
+        // Read CSV line
+        const auto result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
+        if (!result) {
+            return numd;
         }
+        const auto [t, lat, lon, hei] = result->values();
 
-        if (llh.x > 90.0 || llh.x < -90.0 || llh.y > 180.0 || llh.y < -180.0) {
+        if (lat > 90.0 || lat < -90.0 || lon > 180.0 || lon < -180.0) {
             std::cerr << "ERROR: Invalid file format (time[s], latitude[deg], longitude[deg], height [m].\n";
-            numd = 0; // Empty user motion
-            break;
+            return 0; // Empty user motion
         }
 
-        llh.x /= R2D; // convert to RAD
-        llh.y /= R2D; // convert to RAD
+        const auto llh = vec3{
+            lat / R2D, // convert to RAD
+            lon / R2D, // convert to RAD
+            hei};
 
-        xyz[numd] = llh2xyz(llh);
+        output[numd] = llh2xyz(llh);
     }
 
-    fclose(fp);
-
-    return numd;
+    return USER_MOTION_SIZE;
 }
 
 int readNmeaGGA(std::array<vec3, USER_MOTION_SIZE> &xyz, const char *filename) {
@@ -1579,7 +1578,7 @@ int main(int argc, char *argv[]) {
         if (nmeaGGA == TRUE) {
             numd = readNmeaGGA(xyz, umfile);
         } else if (umLLH == TRUE) {
-            numd = readUserMotionLLH(xyz, umfile);
+            numd = read_user_motion_llh(xyz, umfile);
         } else {
             numd = read_user_motion(xyz, umfile);
         }
