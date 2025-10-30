@@ -971,37 +971,36 @@ void compute_range(range_t *rho, const ephem_t &eph, const ionoutc_t &ionoutc, c
 
 /*! \brief Compute the code phase for a given channel (satellite)
  *  \param chan Channel on which we operate (is updated)
- *  \param[in] rho1 Current range, after \a dt has expired
+ *  \param[in] rho Current range, after \a dt has expired
  *  \param[in dt delta-t (time difference) in seconds
  */
-void computeCodePhase(channel_t *chan, const range_t &rho1, const double dt) {
-
+void compute_code_phase(channel_t &chan, const range_t &rho, const double dt) {
     // Pseudorange rate.
-    const double rhorate = (rho1.range - chan->rho0.range) / dt;
+    const auto rhorate = (rho.range - chan.rho0.range) / dt;
 
     // Carrier and code frequency.
-    chan->f_carr = -rhorate / LAMBDA_L1;
-    chan->f_code = CODE_FREQ + chan->f_carr * CARR_TO_CODE;
+    chan.f_carr = -rhorate / LAMBDA_L1;
+    chan.f_code = CODE_FREQ + chan.f_carr * CARR_TO_CODE;
 
     // Initial code phase and data bit counters.
-    const double ms = (chan->rho0.g - chan->g0 + 6.0 - chan->rho0.range / SPEED_OF_LIGHT) * 1000.0;
+    const auto ms = (chan.rho0.g - chan.g0 + 6.0 - chan.rho0.range / SPEED_OF_LIGHT) * 1000.0;
 
-    int ims          = static_cast<int>(ms);
-    chan->code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
+    auto ims        = static_cast<int>(ms);
+    chan.code_phase = (ms - static_cast<double>(ims)) * CA_SEQ_LEN; // in chip
 
-    chan->iword = ims / 600; // 1 word = 30 bits = 600 ms
-    ims -= chan->iword * 600;
+    chan.iword = ims / 600; // 1 word = 30 bits = 600 ms
+    ims -= chan.iword * 600;
 
-    chan->ibit = ims / 20; // 1 bit = 20 code = 20 ms
-    ims -= chan->ibit * 20;
+    chan.ibit = ims / 20; // 1 bit = 20 code = 20 ms
+    ims -= chan.ibit * 20;
 
-    chan->icode = ims; // 1 code = 1 ms
+    chan.icode = ims; // 1 code = 1 ms
 
-    chan->codeCA  = chan->ca[static_cast<int>(chan->code_phase)] * 2 - 1;
-    chan->dataBit = static_cast<int>(chan->dwrd[chan->iword] >> (29 - chan->ibit) & 0x1UL) * 2 - 1;
+    chan.codeCA  = chan.ca[static_cast<int>(chan.code_phase)] * 2 - 1;
+    chan.dataBit = static_cast<int>(chan.dwrd[chan.iword] >> (29 - chan.ibit) & 0x1UL) * 2 - 1;
 
     // Save current pseudorange
-    chan->rho0 = rho1;
+    chan.rho0 = rho;
 }
 
 /*! \brief Read the list of user motions from the input file
@@ -1866,7 +1865,7 @@ int main(int argc, char *argv[]) {
                 chan[i].azel[1] = rho.azel[1];
 
                 // Update code phase and data bit counters
-                computeCodePhase(&chan[i], rho, 0.1);
+                compute_code_phase(chan[i], rho, 0.1);
 #ifndef FLOAT_CARR_PHASE
                 chan[i].carr_phasestep = static_cast<int>(round(512.0 * 65536.0 * chan[i].f_carr * delt));
 #endif
