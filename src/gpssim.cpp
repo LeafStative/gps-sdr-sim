@@ -304,7 +304,7 @@ vec3 ecef2neu(const vec3 &ecef, double t[3][3]) {
  *  \param[in] neu Input position in North-East-Up format
  *  \param[out] azel Output array of azimuth + elevation as double
  */
-void neu2azel(const vec3 &neu, double azel[2]) {
+void neu2azel(const vec3 &neu, const std::span<double, 2> azel) {
     auto azimuth = std::atan2(neu.y, neu.x);
     if (azimuth < 0.0) {
         azimuth += 2.0 * PI;
@@ -655,8 +655,8 @@ std::from_chars_result from_chars_rinex(std::string_view str, VarT &value) {
  *  \param[in] fname File name of the RINEX file
  *  \returns Number of sets of ephemerides in the file
  */
-int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *fname) {
-    std::ifstream fs{fname};
+int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const std::string &filename) {
+    std::ifstream fs{filename};
     if (!fs.is_open()) {
         return -1;
     }
@@ -1220,7 +1220,8 @@ int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
     return 1;
 }
 
-int checkSatVisibility(const ephem_t &eph, const gpstime_t g, const vec3 &xyz, const double elvMask, double *azel) {
+int checkSatVisibility(
+    const ephem_t &eph, const gpstime_t g, const vec3 &xyz, const double elvMask, const std::span<double, 2> azel) {
     double tmat[3][3];
 
     if (!eph.valid) { // Invalid
