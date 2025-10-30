@@ -919,38 +919,38 @@ double ionospheric_delay(const ionoutc_t &ionoutc, const gpstime_t &g, const vec
  *  \param[in] g GPS time at time of receiving the signal
  *  \param[in] xyz position of the receiver
  */
-void computeRange(range_t *rho, const ephem_t &eph, ionoutc_t *ionoutc, const gpstime_t g, const vec3 &xyz) {
+void compute_range(range_t *rho, const ephem_t &eph, const ionoutc_t &ionoutc, const gpstime_t &g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
     vec3                  pos, vel;
     std::array<double, 2> clk;
     satpos(eph, g, pos, vel, clk);
 
     // Receiver to satellite vector and light-time.
-    auto         los = pos - xyz;
-    const double tau = los.length() / SPEED_OF_LIGHT;
+    auto       los = pos - xyz;
+    const auto tau = los.length() / SPEED_OF_LIGHT;
 
     // Extrapolate the satellite position backwards to the transmission time.
     pos -= vel * tau;
 
     // Earth rotation correction. The change in velocity can be neglected.
-    const double x_rot = pos.x + pos.y * OMEGA_EARTH * tau;
-    const double y_rot = pos.y - pos.x * OMEGA_EARTH * tau;
-    pos.x              = x_rot;
-    pos.y              = y_rot;
+    const auto x_rot = pos.x + pos.y * OMEGA_EARTH * tau;
+    const auto y_rot = pos.y - pos.x * OMEGA_EARTH * tau;
+    pos.x            = x_rot;
+    pos.y            = y_rot;
 
     // New observer to satellite vector and satellite range.
-    los                = pos - xyz;
-    const double range = los.length();
-    rho->d             = range;
+    los              = pos - xyz;
+    const auto range = los.length();
+    rho->d           = range;
 
     // Pseudorange.
     rho->range = range - SPEED_OF_LIGHT * clk[0];
 
     // Relative velocity of SV and receiver.
-    const double rate = vel * los / range;
+    const auto rate = vel * los / range;
 
     // Pseudorange rate.
-    rho->rate = rate; // - SPEED_OF_LIGHT*clk[1];
+    rho->rate = rate; // - SPEED_OF_LIGHT * clk[1];
 
     // Time of application.
     rho->g = g;
@@ -965,7 +965,7 @@ void computeRange(range_t *rho, const ephem_t &eph, ionoutc_t *ionoutc, const gp
     neu2azel(neu, rho->azel);
 
     // Add ionospheric delay
-    rho->iono_delay = ionospheric_delay(*ionoutc, g, llh, rho->azel);
+    rho->iono_delay = ionospheric_delay(ionoutc, g, llh, rho->azel);
     rho->range += rho->iono_delay;
 }
 
@@ -1276,14 +1276,14 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, const gpst
                         generateNavMsg(grx, &chan[i], 1);
 
                         // Initialize pseudorange
-                        computeRange(&rho, eph[sv], &ionoutc, grx, xyz);
+                        compute_range(&rho, eph[sv], ionoutc, grx, xyz);
                         chan[i].rho0 = rho;
 
                         // Initialize carrier phase
                         double r_xyz = rho.range;
 
                         constexpr vec3 ref;
-                        computeRange(&rho, eph[sv], &ionoutc, grx, ref);
+                        compute_range(&rho, eph[sv], ionoutc, grx, ref);
                         double r_ref = rho.range;
 
                         double phase_ini = 0.0; // TODO: Must initialize properly
@@ -1857,9 +1857,9 @@ int main(int argc, char *argv[]) {
 
                 // Current pseudorange
                 if (!staticLocationMode) {
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[iumd]);
+                    compute_range(&rho, eph[ieph][sv], ionoutc, grx, xyz[iumd]);
                 } else {
-                    computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[0]);
+                    compute_range(&rho, eph[ieph][sv], ionoutc, grx, xyz[0]);
                 }
 
                 chan[i].azel[0] = rho.azel[0];
