@@ -141,8 +141,8 @@ void codegen(int *ca, const int prn) {
         g1[i] = r1[N_DWORD_SBF - 1];
         g2[i] = r2[N_DWORD_SBF - 1];
 
-        const int c1 = r1[2] * r1[N_DWORD_SBF - 1];
-        const int c2 = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[N_DWORD_SBF - 1];
+        const auto c1 = r1[2] * r1[N_DWORD_SBF - 1];
+        const auto c2 = r2[1] * r2[2] * r2[5] * r2[7] * r2[8] * r2[N_DWORD_SBF - 1];
 
         for (int j = N_DWORD_SBF - 1; j > 0; --j) {
             r1[j] = r1[j - 1];
@@ -164,13 +164,13 @@ void codegen(int *ca, const int prn) {
 gpstime_t date2gps(const datetime_t &t) {
     constexpr auto doy = std::to_array({0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334});
 
-    const int year = t.y - 1980;
+    const auto year = t.y - 1980;
 
     // Compute the number of leap days since Jan 5/Jan 6, 1980.
-    const int leap_days = year % 4 == 0 && t.m <= 2 ? year / 4 : year / 4 + 1;
+    const auto leap_days = year % 4 == 0 && t.m <= 2 ? year / 4 : year / 4 + 1;
 
     // Compute the number of days elapsed since Jan 5/Jan 6, 1980.
-    const int days_elapsed = year * 365 + doy[t.m - 1] + t.d + leap_days - 6;
+    const auto days_elapsed = year * 365 + doy[t.m - 1] + t.d + leap_days - 6;
 
     // Convert time to GPS weeks and seconds.
     return gpstime_t{
@@ -185,10 +185,10 @@ gpstime_t date2gps(const datetime_t &t) {
  */
 datetime_t gps2date(const gpstime_t &g) {
     // Convert Julian day number to calendar date
-    const int c = static_cast<int>(7 * g.week + std::floor(g.sec / 86400.0) + 2444245.0) + 1537;
-    const int d = static_cast<int>((c - 122.1) / 365.25);
-    const int e = 365 * d + d / 4;
-    const int f = static_cast<int>((c - e) / 30.6001);
+    const auto c = static_cast<int>(7 * g.week + std::floor(g.sec / 86400.0) + 2444245.0) + 1537;
+    const auto d = static_cast<int>((c - 122.1) / 365.25);
+    const auto e = 365 * d + d / 4;
+    const auto f = static_cast<int>((c - e) / 30.6001);
 
     const auto minutes = f - 1 - 12 * (f / 14);
     return datetime_t{
@@ -205,11 +205,11 @@ datetime_t gps2date(const gpstime_t &g) {
  *  \return Output vector of Latitude, Longitude and Height
  */
 vec3 xyz2llh(const vec3 &xyz) {
-    constexpr double a = WGS84_RADIUS;
-    constexpr double e = WGS84_ECCENTRICITY;
+    constexpr auto a = WGS84_RADIUS;
+    constexpr auto e = WGS84_ECCENTRICITY;
 
-    constexpr double eps = 1.0e-3;
-    constexpr double e2  = e * e;
+    constexpr auto eps = 1.0e-3;
+    constexpr auto e2  = e * e;
 
     if (xyz.length() < eps) {
         // Invalid ECEF vector
@@ -218,16 +218,16 @@ vec3 xyz2llh(const vec3 &xyz) {
 
     const auto &[x, y, z] = xyz;
 
-    const double rho2 = x * x + y * y;
-    double       dz   = e2 * z;
+    const auto rho2 = x * x + y * y;
+    auto       dz   = e2 * z;
 
     double zdz, nh, n;
     while (true) {
-        zdz                 = z + dz;
-        nh                  = std::sqrt(rho2 + zdz * zdz);
-        const double slat   = zdz / nh;
-        n                   = a / std::sqrt(1.0 - e2 * slat * slat);
-        const double dz_new = n * e2 * slat;
+        zdz               = z + dz;
+        nh                = std::sqrt(rho2 + zdz * zdz);
+        const auto slat   = zdz / nh;
+        n                 = a / std::sqrt(1.0 - e2 * slat * slat);
+        const auto dz_new = n * e2 * slat;
 
         if (std::abs(dz - dz_new) < eps) {
             break;
@@ -246,20 +246,20 @@ vec3 xyz2llh(const vec3 &xyz) {
  *  \return Output vector of X, Y and Z ECEF coordinates
  */
 vec3 llh2xyz(const vec3 &llh) {
-    constexpr double a  = WGS84_RADIUS;
-    constexpr double e  = WGS84_ECCENTRICITY;
-    constexpr double e2 = e * e;
+    constexpr auto a  = WGS84_RADIUS;
+    constexpr auto e  = WGS84_ECCENTRICITY;
+    constexpr auto e2 = e * e;
 
-    const double c_lat = std::cos(llh.x);
-    const double s_lat = std::sin(llh.x);
-    const double c_lon = std::cos(llh.y);
-    const double s_lon = std::sin(llh.y);
-    const double d     = e * s_lat;
+    const auto c_lat = std::cos(llh.x);
+    const auto s_lat = std::sin(llh.x);
+    const auto c_lon = std::cos(llh.y);
+    const auto s_lon = std::sin(llh.y);
+    const auto d     = e * s_lat;
 
-    const double n   = a / std::sqrt(1.0 - d * d);
-    const double nph = n + llh.z;
+    const auto n   = a / std::sqrt(1.0 - d * d);
+    const auto nph = n + llh.z;
 
-    const double tmp = nph * c_lat;
+    const auto tmp = nph * c_lat;
 
     return vec3{
         tmp * c_lon, //
@@ -310,9 +310,9 @@ void neu2azel(const vec3 &neu, double azel[2]) {
         azimuth += 2.0 * PI;
     }
 
-    const double ne = std::sqrt(neu.x * neu.x + neu.y * neu.y);
-    azel[0]         = azimuth;
-    azel[1]         = std::atan2(neu.z, ne);
+    const auto ne = std::sqrt(neu.x * neu.x + neu.y * neu.y);
+    azel[0]       = azimuth;
+    azel[1]       = std::atan2(neu.z, ne);
 }
 
 /*! \brief Compute Satellite position, velocity and clock at given time
@@ -337,7 +337,7 @@ void satpos(const ephem_t &eph, const gpstime_t &g, vec3 &pos, vec3 &vel, std::s
     auto       ek     = mk;
     auto       ek_old = ek + 1.0;
 
-    double one_minus_ecos_e = 0; // Suppress the uninitialized warning.
+    auto one_minus_ecos_e = 0.0; // Suppress the uninitialized warning.
     while (std::abs(ek - ek_old) > 1.0E-14) {
         ek_old           = ek;
         one_minus_ecos_e = 1.0 - eph.ecc * std::cos(ek_old);
@@ -411,17 +411,17 @@ void satpos(const ephem_t &eph, const gpstime_t &g, vec3 &pos, vec3 &vel, std::s
 void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][N_DWORD_SBF]) {
     // FIXED: This has to be the "transmission" week number, not for the ephemeris reference time
     // wn = (unsigned long)(eph.toe.week%1024);
-    constexpr unsigned long wn  = 0UL;
-    constexpr unsigned long ura = 0UL;
+    constexpr auto wn  = 0UL;
+    constexpr auto ura = 0UL;
 
-    const unsigned long code_l2 = static_cast<unsigned long>(eph.codeL2);
-    const unsigned long svhlth  = static_cast<unsigned long>(eph.svhlth);
-    const unsigned long iodc    = static_cast<unsigned long>(eph.iodc);
-    const long          tgd     = static_cast<long>(eph.tgd / POW2_M31);
-    const unsigned long toc     = static_cast<unsigned long>(eph.toc.sec / 16.0);
-    const long          af0     = static_cast<long>(eph.af0 / POW2_M31);
-    const long          af1     = static_cast<long>(eph.af1 / POW2_M43);
-    const long          af2     = static_cast<long>(eph.af2 / POW2_M55);
+    const auto code_l2 = static_cast<unsigned long>(eph.codeL2);
+    const auto svhlth  = static_cast<unsigned long>(eph.svhlth);
+    const auto iodc    = static_cast<unsigned long>(eph.iodc);
+    const auto tgd     = static_cast<long>(eph.tgd / POW2_M31);
+    const auto toc     = static_cast<unsigned long>(eph.toc.sec / 16.0);
+    const auto af0     = static_cast<long>(eph.af0 / POW2_M31);
+    const auto af1     = static_cast<long>(eph.af1 / POW2_M43);
+    const auto af2     = static_cast<long>(eph.af2 / POW2_M55);
 
     // Subframe 1
     sbf[0][0] = 0x8B0000UL << 6;
@@ -436,15 +436,15 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
     sbf[0][8] = (af2 & 0xFFUL) << 22 | (af1 & 0xFFFFUL) << 6;
     sbf[0][9] = (af0 & 0x3FFFFFUL) << 8;
 
-    const unsigned long iode   = static_cast<unsigned long>(eph.iode);
-    const long          crs    = static_cast<long>(eph.crs / POW2_M5);
-    const long          deltan = static_cast<long>(eph.deltan / POW2_M43 / PI);
-    const long          m0     = static_cast<long>(eph.m0 / POW2_M31 / PI);
-    const long          cuc    = static_cast<long>(eph.cuc / POW2_M29);
-    const unsigned long ecc    = static_cast<unsigned long>(eph.ecc / POW2_M33);
-    const long          cus    = static_cast<long>(eph.cus / POW2_M29);
-    const unsigned long sqrta  = static_cast<unsigned long>(eph.sqrta / POW2_M19);
-    const unsigned long toe    = static_cast<unsigned long>(eph.toe.sec / 16.0);
+    const auto iode   = static_cast<unsigned long>(eph.iode);
+    const auto crs    = static_cast<long>(eph.crs / POW2_M5);
+    const auto deltan = static_cast<long>(eph.deltan / POW2_M43 / PI);
+    const auto m0     = static_cast<long>(eph.m0 / POW2_M31 / PI);
+    const auto cuc    = static_cast<long>(eph.cuc / POW2_M29);
+    const auto ecc    = static_cast<unsigned long>(eph.ecc / POW2_M33);
+    const auto cus    = static_cast<long>(eph.cus / POW2_M29);
+    const auto sqrta  = static_cast<unsigned long>(eph.sqrta / POW2_M19);
+    const auto toe    = static_cast<unsigned long>(eph.toe.sec / 16.0);
 
     // Subframe 2
     sbf[1][0] = 0x8B0000UL << 6;
@@ -458,14 +458,14 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
     sbf[1][8] = (sqrta & 0xFFFFFFUL) << 6;
     sbf[1][9] = (toe & 0xFFFFUL) << 14;
 
-    const long cic    = static_cast<long>(eph.cic / POW2_M29);
-    const long cis    = static_cast<long>(eph.cis / POW2_M29);
-    const long omg0   = static_cast<long>(eph.omg0 / POW2_M31 / PI);
-    const long inc0   = static_cast<long>(eph.inc0 / POW2_M31 / PI);
-    const long crc    = static_cast<long>(eph.crc / POW2_M5);
-    const long aop    = static_cast<long>(eph.aop / POW2_M31 / PI);
-    const long omgdot = static_cast<long>(eph.omgdot / POW2_M43 / PI);
-    const long idot   = static_cast<long>(eph.idot / POW2_M43 / PI);
+    const auto cic    = static_cast<long>(eph.cic / POW2_M29);
+    const auto cis    = static_cast<long>(eph.cis / POW2_M29);
+    const auto omg0   = static_cast<long>(eph.omg0 / POW2_M31 / PI);
+    const auto inc0   = static_cast<long>(eph.inc0 / POW2_M31 / PI);
+    const auto crc    = static_cast<long>(eph.crc / POW2_M5);
+    const auto aop    = static_cast<long>(eph.aop / POW2_M31 / PI);
+    const auto omgdot = static_cast<long>(eph.omgdot / POW2_M43 / PI);
+    const auto idot   = static_cast<long>(eph.idot / POW2_M43 / PI);
 
     // Subframe 3
     sbf[2][0] = 0x8B0000UL << 6;
@@ -483,19 +483,19 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
     if (ionoutc.valid) {
         constexpr unsigned long sbf4_page18_sv_id = 56UL;
 
-        const signed long   alpha0 = static_cast<signed long>(std::round(ionoutc.alpha0 / POW2_M30));
-        const signed long   alpha1 = static_cast<signed long>(std::round(ionoutc.alpha1 / POW2_M27));
-        const signed long   alpha2 = static_cast<signed long>(std::round(ionoutc.alpha2 / POW2_M24));
-        const signed long   alpha3 = static_cast<signed long>(std::round(ionoutc.alpha3 / POW2_M24));
-        const signed long   beta0  = static_cast<signed long>(std::round(ionoutc.beta0 / 2048.0));
-        const signed long   beta1  = static_cast<signed long>(std::round(ionoutc.beta1 / 16384.0));
-        const signed long   beta2  = static_cast<signed long>(std::round(ionoutc.beta2 / 65536.0));
-        const signed long   beta3  = static_cast<signed long>(std::round(ionoutc.beta3 / 65536.0));
-        const signed long   a0     = static_cast<signed long>(std::round(ionoutc.a0 / POW2_M30));
-        const signed long   a1     = static_cast<signed long>(std::round(ionoutc.a1 / POW2_M50));
-        const signed long   dtls   = ionoutc.dtls;
-        const unsigned long tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
-        const unsigned long wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
+        const auto alpha0 = static_cast<long>(std::round(ionoutc.alpha0 / POW2_M30));
+        const auto alpha1 = static_cast<long>(std::round(ionoutc.alpha1 / POW2_M27));
+        const auto alpha2 = static_cast<long>(std::round(ionoutc.alpha2 / POW2_M24));
+        const auto alpha3 = static_cast<long>(std::round(ionoutc.alpha3 / POW2_M24));
+        const auto beta0  = static_cast<long>(std::round(ionoutc.beta0 / 2048.0));
+        const auto beta1  = static_cast<long>(std::round(ionoutc.beta1 / 16384.0));
+        const auto beta2  = static_cast<long>(std::round(ionoutc.beta2 / 65536.0));
+        const auto beta3  = static_cast<long>(std::round(ionoutc.beta3 / 65536.0));
+        const auto a0     = static_cast<long>(std::round(ionoutc.a0 / POW2_M30));
+        const auto a1     = static_cast<long>(std::round(ionoutc.a1 / POW2_M50));
+        const auto dtls   = ionoutc.dtls;
+        const auto tot    = static_cast<unsigned long>(ionoutc.tot / 4096);
+        const auto wnt    = static_cast<unsigned long>(ionoutc.wnt % 256);
 
         // 2016/12/31 (Sat) -> WNlsf = 1929, DN = 7 (http://navigationservices.agi.com/GNSSWeb/)
         // Days are counted from 1 to 7 (Sunday is 1).
@@ -523,7 +523,7 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
         sbf[3][9] = (dtlsf & 0xFFUL) << 22;
 
     } else {
-        constexpr unsigned long sbf4_page25_sv_id = 63UL;
+        constexpr auto sbf4_page25_sv_id = 63UL;
 
         // Subframe 4, page 25
         sbf[3][0] = 0x8B0000UL << 6;
@@ -538,10 +538,10 @@ void eph2sbf(const ephem_t &eph, const ionoutc_t &ionoutc, unsigned long sbf[5][
         sbf[3][9] = 0UL;
     }
 
-    constexpr unsigned long sbf5_page25_sv_id = 51UL;
+    constexpr auto sbf5_page25_sv_id = 51UL;
 
-    const unsigned long wna = static_cast<unsigned long>(eph.toe.week % 256);
-    const unsigned long toa = static_cast<unsigned long>(eph.toe.sec / 4096.0);
+    const auto wna = static_cast<unsigned long>(eph.toe.week % 256);
+    const auto toa = static_cast<unsigned long>(eph.toe.sec / 4096.0);
 
     // Subframe 5, page 25
     sbf[4][0] = 0x8B0000UL << 6;
@@ -588,9 +588,9 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
 
     constexpr auto b_mask = std::to_array({0x3B1F3480UL, 0x1D8F9A40UL, 0x2EC7CD00UL, 0x1763E680UL, 0x2BB1F340UL, 0x0B7A89C0UL});
 
-    unsigned long       d   = source & 0x3FFFFFC0UL;
-    const unsigned long d29 = source >> 31 & 0x1UL;
-    const unsigned long d30 = source >> 30 & 0x1UL;
+    auto       d   = source & 0x3FFFFFC0UL;
+    const auto d29 = source >> 31 & 0x1UL;
+    const auto d30 = source >> 30 & 0x1UL;
 
     if (nib) { // Non-information bearing bits for word 2 and 10
         /*
@@ -606,7 +606,7 @@ unsigned long compute_checksum(const unsigned long source, const bool nib) {
         }
     }
 
-    unsigned long result = d;
+    auto result = d;
     if (d30) {
         result ^= 0x3FFFFFC0UL;
     }
