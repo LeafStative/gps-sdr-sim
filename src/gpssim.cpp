@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -857,77 +858,59 @@ int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const char *f
     return ieph;
 }
 
-double ionosphericDelay(const ionoutc_t *ionoutc, const gpstime_t g, const vec3 &llh, double *azel) {
+double ionospheric_delay(const ionoutc_t &ionoutc, const gpstime_t &g, const vec3 &llh, const std::span<const double, 2> azel) {
 
-    if (!ionoutc->enable) { // No ionospheric delay
+    if (!ionoutc.enable) { // No ionospheric delay
         return 0.0;
     }
 
-    const double E = azel[1] / PI;
+    const auto e = azel[1] / PI;
     // Obliquity factor
-    const double F = 1.0 + 16.0 * pow(0.53 - E, 3.0);
+    const auto f = 1.0 + 16.0 * pow(0.53 - e, 3.0);
 
-    double iono_delay;
-    if (!ionoutc->valid) {
-        iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
-    } else {
-        // Earth's central angle between the user position and the earth projection of
-        // ionospheric intersection point (semi-circles)
-        const double psi = 0.0137 / (E + 0.11) - 0.022;
-
-        // Geodetic latitude of the earth projection of the ionospheric intersection point
-        // (semi-circles)
-        const double phi_u = llh.x / PI;
-        double       phi_i = phi_u + psi * cos(azel[0]);
-        if (phi_i > 0.416) {
-            phi_i = 0.416;
-        } else if (phi_i < -0.416) {
-            phi_i = -0.416;
-        }
-
-        // Geodetic longitude of the earth projection of the ionospheric intersection point
-        // (semi-circles)
-        const double lam_u = llh.y / PI;
-        const double lam_i = lam_u + psi * sin(azel[0]) / cos(phi_i * PI);
-
-        // Geomagnetic latitude of the earth projection of the ionospheric intersection
-        // point (mean ionospheric height assumed 350 km) (semi-circles)
-        const double phi_m  = phi_i + 0.064 * cos((lam_i - 1.617) * PI);
-        const double phi_m2 = phi_m * phi_m;
-        const double phi_m3 = phi_m2 * phi_m;
-
-        double AMP = ionoutc->alpha0 + ionoutc->alpha1 * phi_m + ionoutc->alpha2 * phi_m2 + ionoutc->alpha3 * phi_m3;
-        if (AMP < 0.0) {
-            AMP = 0.0;
-        }
-
-        double PER = ionoutc->beta0 + ionoutc->beta1 * phi_m + ionoutc->beta2 * phi_m2 + ionoutc->beta3 * phi_m3;
-        if (PER < 72000.0) {
-            PER = 72000.0;
-        }
-
-        // Local time (sec)
-        double t = SECONDS_IN_DAY / 2.0 * lam_i + g.sec;
-        while (t >= SECONDS_IN_DAY) {
-            t -= SECONDS_IN_DAY;
-        }
-        while (t < 0) {
-            t += SECONDS_IN_DAY;
-        }
-
-        // Phase (radians)
-        const double X = 2.0 * PI * (t - 50400.0) / PER;
-
-        if (fabs(X) < 1.57) {
-            const double X2 = X * X;
-            const double X4 = X2 * X2;
-            iono_delay      = F * (5.0e-9 + AMP * (1.0 - X2 / 2.0 + X4 / 24.0)) * SPEED_OF_LIGHT;
-        } else {
-            iono_delay = F * 5.0e-9 * SPEED_OF_LIGHT;
-        }
+    if (!ionoutc.valid) {
+        return f * 5.0e-9 * SPEED_OF_LIGHT;
     }
 
-    return iono_delay;
+    // Earth's central angle between the user position and the earth projection of
+    // ionospheric intersection point (semi-circles)
+    const auto psi = 0.0137 / (e + 0.11) - 0.022;
+
+    // Geodetic latitude of the earth projection of the ionospheric intersection point
+    // (semi-circles)
+    const auto phi_u = llh.x / PI;
+    const auto phi_i = std::clamp(phi_u + psi * cos(azel[0]), -0.416, 0.416);
+
+    // Geodetic longitude of the earth projection of the ionospheric intersection point
+    // (semi-circles)
+    const auto lam_u = llh.y / PI;
+    const auto lam_i = lam_u + psi * sin(azel[0]) / cos(phi_i * PI);
+
+    // Geomagnetic latitude of the earth projection of the ionospheric intersection
+    // point (mean ionospheric height assumed 350 km) (semi-circles)
+    const auto phi_m  = phi_i + 0.064 * cos((lam_i - 1.617) * PI);
+    const auto phi_m2 = phi_m * phi_m;
+    const auto phi_m3 = phi_m2 * phi_m;
+
+    const auto amp = std::max(ionoutc.alpha0 + ionoutc.alpha1 * phi_m + ionoutc.alpha2 * phi_m2 + ionoutc.alpha3 * phi_m3, 0.0);
+    const auto per = std::max(ionoutc.beta0 + ionoutc.beta1 * phi_m + ionoutc.beta2 * phi_m2 + ionoutc.beta3 * phi_m3, 72000.0);
+
+    // Local time (sec)
+    auto t    = SECONDS_IN_DAY / 2.0 * lam_i + g.sec;
+    auto days = std::floor(t / SECONDS_IN_DAY);
+    if (t < 0) {
+        days = -days - 1;
+    }
+    t -= days * SECONDS_IN_DAY;
+
+    // Phase (radians)
+    if (const auto x = 2.0 * PI * (t - 50400.0) / per; std::abs(x) < 1.57) {
+        const auto x2 = x * x;
+        const auto x4 = x2 * x2;
+        return f * (5.0e-9 + amp * (1.0 - x2 / 2.0 + x4 / 24.0)) * SPEED_OF_LIGHT;
+    }
+
+    return f * 5.0e-9 * SPEED_OF_LIGHT;
 }
 
 /*! \brief Compute range between a satellite and the receiver
@@ -982,7 +965,7 @@ void computeRange(range_t *rho, const ephem_t &eph, ionoutc_t *ionoutc, const gp
     neu2azel(neu, rho->azel);
 
     // Add ionospheric delay
-    rho->iono_delay = ionosphericDelay(ionoutc, g, llh, rho->azel);
+    rho->iono_delay = ionospheric_delay(*ionoutc, g, llh, rho->azel);
     rho->range += rho->iono_delay;
 }
 
