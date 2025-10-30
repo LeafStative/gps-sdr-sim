@@ -1160,78 +1160,72 @@ int read_nmea_gga(const std::span<vec3, USER_MOTION_SIZE> output, const std::str
     return USER_MOTION_SIZE;
 }
 
-int generateNavMsg(const gpstime_t g, channel_t *chan, const int init) {
-    // int           iwrd;
-    // unsigned      sbfwrd;
-    // unsigned long prevwrd;
-    // int           nib;
+void generate_nav_msg(const gpstime_t g, channel_t &chan, const bool init) {
+    // Data bit reference time
+    chan.g0 = gpstime_t{
+        .week = g.week,
+        .sec  = std::floor(std::round(g.sec) / 30.0) * 30.0 // Align with the full frame length = 30 sec
+    };
 
-    gpstime_t g0;
-    g0.week = g.week;
-    g0.sec =
-        static_cast<double>(static_cast<unsigned long>(g.sec + 0.5) / 30UL) * 30.0; // Align with the full frame length = 30 sec
-    chan->g0 = g0;                                                                  // Data bit reference time
+    auto tow = static_cast<unsigned long>(chan.g0.sec) / 6UL;
 
-    const unsigned long wn  = static_cast<unsigned long>(g0.week % 1024);
-    unsigned long       tow = static_cast<unsigned long>(g0.sec) / 6UL;
-
-    unsigned long prevwrd;
-    if (init == 1) { // Initialize subframe 5
-        prevwrd = 0UL;
-
-        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
-            unsigned sbfwrd = chan->sbf[4][iwrd];
+    auto prev_word = 0UL;
+    if (init) { // Initialize subframe 5
+        for (size_t i = 0; i < N_DWORD_SBF; i++) {
+            auto sbf_word = chan.sbf[4][i];
 
             // Add TOW-count message into HOW
-            if (iwrd == 1) {
-                sbfwrd |= (tow & 0x1FFFFUL) << 13;
+            if (i == 1) {
+                sbf_word |= (tow & 0x1FFFFUL) << 13;
             }
 
             // Compute checksum
-            sbfwrd |= prevwrd << 30 & 0xC0000000UL;            // 2 LSBs of the previous transmitted word
-            int nib          = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
-            chan->dwrd[iwrd] = compute_checksum(sbfwrd, nib);
+            sbf_word |= prev_word << 30 & 0xC0000000UL; // 2 LSBs of the previous transmitted word
+            const auto nib = i == 1 || i == 9;          // Non-information bearing bits for word 2 and 10
+            chan.dwrd[i]   = compute_checksum(sbf_word, nib);
 
-            prevwrd = chan->dwrd[iwrd];
+            prev_word = chan.dwrd[i];
         }
     } else { // Save subframe 5
-        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
-            chan->dwrd[iwrd] = chan->dwrd[N_DWORD_SBF * N_SBF + iwrd];
-
-            prevwrd = chan->dwrd[iwrd];
+        for (size_t i = 0; i < N_DWORD_SBF; i++) {
+            chan.dwrd[i] = chan.dwrd[N_DWORD_SBF * N_SBF + i];
         }
+        prev_word = chan.dwrd[N_DWORD_SBF - 1];
         /*
         // Sanity check
-        if (((chan->dwrd[1])&(0x1FFFFUL<<13)) != ((tow&0x1FFFFUL)<<13))
-        {
-                std::cerr << "\nWARNING: Invalid TOW in subframe 5.\n";
-                return(0);
+        if ((chan.dwrd[1] & 0x1FFFFUL << 13) != (tow & 0x1FFFFUL) << 13) {
+            std::cerr << "\nWARNING: Invalid TOW in subframe 5.\n";
+            return;
         }
         */
     }
 
-    for (size_t isbf = 0; isbf < N_SBF; isbf++) {
+    const auto wn = static_cast<unsigned long>(chan.g0.week % 1024);
+
+    for (size_t i_sbf = 0; i_sbf < N_SBF; i_sbf++) {
         tow++;
 
-        for (size_t iwrd = 0; iwrd < N_DWORD_SBF; iwrd++) {
-            unsigned sbfwrd = chan->sbf[isbf][iwrd];
+        for (size_t i_word = 0; i_word < N_DWORD_SBF; i_word++) {
+            unsigned sbf_word = chan.sbf[i_sbf][i_word];
 
             // Add transmission week number to Subframe 1
-            if (isbf == 0 && iwrd == 2) sbfwrd |= (wn & 0x3FFUL) << 20;
+            if (i_sbf == 0 && i_word == 2) {
+                sbf_word |= (wn & 0x3FFUL) << 20;
+            }
 
             // Add TOW-count message into HOW
-            if (iwrd == 1) sbfwrd |= (tow & 0x1FFFFUL) << 13;
+            if (i_word == 1) {
+                sbf_word |= (tow & 0x1FFFFUL) << 13;
+            }
 
             // Compute checksum
-            sbfwrd |= prevwrd << 30 & 0xC0000000UL;   // 2 LSBs of the previous transmitted word
-            int nib = iwrd == 1 || iwrd == 9 ? 1 : 0; // Non-information bearing bits for word 2 and 10
-            chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd] = compute_checksum(sbfwrd, nib);
+            sbf_word |= prev_word << 30 & 0xC0000000UL;  // 2 LSBs of the previous transmitted word
+            const auto nib = i_word == 1 || i_word == 9; // Non-information bearing bits for word 2 and 10
+            chan.dwrd[(i_sbf + 1) * N_DWORD_SBF + i_word] = compute_checksum(sbf_word, nib);
 
-            prevwrd = chan->dwrd[(isbf + 1) * N_DWORD_SBF + iwrd];
+            prev_word = chan.dwrd[(i_sbf + 1) * N_DWORD_SBF + i_word];
         }
     }
-
-    return 1;
 }
 
 int checkSatVisibility(
@@ -1287,7 +1281,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, const gpst
                         eph2sbf(eph[sv], ionoutc, chan[i].sbf);
 
                         // Generate navigation message
-                        generateNavMsg(grx, &chan[i], 1);
+                        generate_nav_msg(grx, chan[i], true);
 
                         // Initialize pseudorange
                         compute_range(&rho, eph[sv], ionoutc, grx, xyz);
@@ -1998,7 +1992,7 @@ int main(int argc, char *argv[]) {
         if (igrx % 300 == 0) { // Every 30 seconds
             // Update navigation message
             for (int i = 0; i < MAX_CHAN; i++) {
-                if (chan[i].prn > 0) generateNavMsg(grx, &chan[i], 0);
+                if (chan[i].prn > 0) generate_nav_msg(grx, chan[i], false);
             }
 
             // Refresh ephemeris and subframes
