@@ -1004,11 +1004,11 @@ void compute_code_phase(channel_t &chan, const range_t &rho, const double dt) {
 }
 
 /*! \brief Read the list of user motions from the input file
- *  \param[out] xyz Output array of ECEF vectors for user motion
+ *  \param[out] output Output array of ECEF vectors for user motion
  *  \param[in] filename File name of the text input file
  *  \returns Number of user data motion records read, -1 on error
  */
-int read_user_motion(std::array<vec3, USER_MOTION_SIZE> &xyz, const std::string &filename) {
+int read_user_motion(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
     std::ifstream fs{filename};
     if (!fs.is_open()) {
         return -1;
@@ -1028,7 +1028,7 @@ int read_user_motion(std::array<vec3, USER_MOTION_SIZE> &xyz, const std::string 
         }
         const auto [t, x, y, z] = result->values();
 
-        xyz[num_read] = vec3{x, y, z};
+        output[num_read] = vec3{x, y, z};
     }
 
     return num_read;
