@@ -925,7 +925,7 @@ double ionospheric_delay(const ionoutc_t &ionoutc, const gpstime_t &g, const vec
  *  \param[in] g GPS time at time of receiving the signal
  *  \param[in] xyz position of the receiver
  */
-void compute_range(range_t *rho, const ephem_t &eph, const ionoutc_t &ionoutc, const gpstime_t &g, const vec3 &xyz) {
+void compute_range(range_t &rho, const ephem_t &eph, const ionoutc_t &ionoutc, const gpstime_t &g, const vec3 &xyz) {
     // SV position at time of the pseudorange observation.
     vec3                  pos, vel;
     std::array<double, 2> clk;
@@ -947,19 +947,19 @@ void compute_range(range_t *rho, const ephem_t &eph, const ionoutc_t &ionoutc, c
     // New observer to satellite vector and satellite range.
     los              = pos - xyz;
     const auto range = los.length();
-    rho->d           = range;
+    rho.d            = range;
 
     // Pseudorange.
-    rho->range = range - SPEED_OF_LIGHT * clk[0];
+    rho.range = range - SPEED_OF_LIGHT * clk[0];
 
     // Relative velocity of SV and receiver.
     const auto rate = vel * los / range;
 
     // Pseudorange rate.
-    rho->rate = rate; // - SPEED_OF_LIGHT * clk[1];
+    rho.rate = rate; // - SPEED_OF_LIGHT * clk[1];
 
     // Time of application.
-    rho->g = g;
+    rho.g = g;
 
     // Azimuth and elevation angles.
     const auto llh = xyz2llh(xyz);
@@ -968,11 +968,11 @@ void compute_range(range_t *rho, const ephem_t &eph, const ionoutc_t &ionoutc, c
     ltcmat(llh, tmat);
 
     const auto neu = ecef2neu(los, tmat);
-    neu2azel(neu, rho->azel);
+    neu2azel(neu, rho.azel);
 
     // Add ionospheric delay
-    rho->iono_delay = ionospheric_delay(ionoutc, g, llh, rho->azel);
-    rho->range += rho->iono_delay;
+    rho.iono_delay = ionospheric_delay(ionoutc, g, llh, rho.azel);
+    rho.range += rho.iono_delay;
 }
 
 /*! \brief Compute the code phase for a given channel (satellite)
@@ -1228,11 +1228,10 @@ void generate_nav_msg(const gpstime_t g, channel_t &chan, const bool init) {
     }
 }
 
-int check_sat_visibility(
+bool check_sat_visibility(
     const ephem_t &eph, const gpstime_t &g, const vec3 &xyz, const double elv_mask, const std::span<double, 2> azel) {
-
     if (!eph.valid) { // Invalid
-        return -1;
+        return false;
     }
 
     const auto llh = xyz2llh(xyz);
@@ -1247,79 +1246,90 @@ int check_sat_visibility(
     const auto neu = ecef2neu(los, tmat);
     neu2azel(neu, azel);
 
-    if (azel[1] * R2D > elv_mask) { // Visible
-        return 1;
-    }
-
-    // else
-    return 0; // Invisible
+    // Visibility
+    return azel[1] * R2D > elv_mask;
 }
 
-int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, const gpstime_t grx, const vec3 &xyz, double elvMask) {
-    int     nsat = 0;
-    double  azel[2];
-    range_t rho;
+size_t allocate_channel(
+    const std::span<channel_t, MAX_CHAN>    chan,
+    const std::span<const ephem_t, MAX_SAT> eph,
+    const ionoutc_t                        &ionoutc,
+    const gpstime_t                        &grx,
+    const vec3                             &xyz) {
 
-    for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        if (check_sat_visibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
-            nsat++; // Number of visible satellites
+    size_t sat_count = 0;
 
-            if (allocated_sat[sv] == -1) { // Visible but not allocated
-                int i;
-                // Allocated new satellite
-                for (i = 0; i < MAX_CHAN; i++) {
-                    if (chan[i].prn == 0) {
-                        // Initialize channel
-                        chan[i].prn     = sv + 1;
-                        chan[i].azel[0] = azel[0];
-                        chan[i].azel[1] = azel[1];
-
-                        // C/A code generation
-                        codegen(chan[i].ca, chan[i].prn);
-
-                        // Generate subframe
-                        eph2sbf(eph[sv], ionoutc, chan[i].sbf);
-
-                        // Generate navigation message
-                        generate_nav_msg(grx, chan[i], true);
-
-                        // Initialize pseudorange
-                        compute_range(&rho, eph[sv], ionoutc, grx, xyz);
-                        chan[i].rho0 = rho;
-
-                        // Initialize carrier phase
-                        double r_xyz = rho.range;
-
-                        constexpr vec3 ref;
-                        compute_range(&rho, eph[sv], ionoutc, grx, ref);
-                        double r_ref = rho.range;
-
-                        double phase_ini = 0.0; // TODO: Must initialize properly
-                                                // phase_ini = (2.0*r_ref - r_xyz)/LAMBDA_L1;
-#ifdef FLOAT_CARR_PHASE
-                        chan[i].carr_phase = phase_ini - floor(phase_ini);
-#else
-                        phase_ini -= floor(phase_ini);
-                        chan[i].carr_phase = static_cast<unsigned int>(512.0 * 65536.0 * phase_ini);
-#endif
-                        // Done.
-                        break;
-                    }
-                }
-
-                // Set satellite allocation channel
-                if (i < MAX_CHAN) allocated_sat[sv] = i;
-            }
-        } else if (allocated_sat[sv] >= 0) { // Not visible but allocated
+    for (size_t sv = 0; sv < MAX_SAT; ++sv) {
+        std::array<double, 2> azel;
+        if (!check_sat_visibility(eph[sv], grx, xyz, 0.0, azel) && allocated_sat[sv] >= 0) { // Not visible but allocated
             // Clear channel
             chan[allocated_sat[sv]].prn = 0;
 
             // Clear satellite allocation flag
             allocated_sat[sv] = -1;
+            continue;
+        }
+
+        ++sat_count; // Number of visible satellites
+
+        if (allocated_sat[sv] != -1) {
+            continue;
+        }
+
+        // Visible but not allocated
+
+        // Allocated new satellite
+        int i;
+        for (i = 0; i < MAX_CHAN; i++) {
+            if (chan[i].prn != 0) {
+                continue;
+            }
+
+            // Initialize channel
+            chan[i].prn     = static_cast<int>(sv + 1);
+            chan[i].azel[0] = azel[0];
+            chan[i].azel[1] = azel[1];
+
+            // C/A code generation
+            codegen(chan[i].ca, chan[i].prn);
+
+            // Generate subframe
+            eph2sbf(eph[sv], ionoutc, chan[i].sbf);
+
+            // Generate navigation message
+            generate_nav_msg(grx, chan[i], true);
+
+            // Initialize pseudorange
+            range_t rho;
+            compute_range(rho, eph[sv], ionoutc, grx, xyz);
+            chan[i].rho0 = rho;
+
+            // Initialize carrier phase
+            const auto r_xyz = rho.range;
+
+            constexpr vec3 ref;
+            compute_range(rho, eph[sv], ionoutc, grx, ref);
+            const auto r_ref = rho.range;
+
+            auto phase_ini = 0.0; // TODO: Must initialize properly
+                                  // phase_ini = (2.0*r_ref - r_xyz)/LAMBDA_L1;
+#ifdef FLOAT_CARR_PHASE
+            chan[i].carr_phase = phase_ini - floor(phase_ini);
+#else
+            phase_ini -= floor(phase_ini);
+            chan[i].carr_phase = static_cast<unsigned int>(512.0 * 65536.0 * phase_ini);
+#endif
+            // Done.
+            break;
+        }
+
+        // Set satellite allocation channel
+        if (i < MAX_CHAN) {
+            allocated_sat[sv] = i;
         }
     }
 
-    return nsat;
+    return sat_count;
 }
 
 void usage() {
@@ -1826,7 +1836,7 @@ int main(int argc, char *argv[]) {
     grx = g0 + 0.0;
 
     // Allocate visible satellites
-    allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
+    allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[0]);
 
     for (int i = 0; i < MAX_CHAN; i++) {
         if (chan[i].prn > 0)
@@ -1865,9 +1875,9 @@ int main(int argc, char *argv[]) {
 
                 // Current pseudorange
                 if (!staticLocationMode) {
-                    compute_range(&rho, eph[ieph][sv], ionoutc, grx, xyz[iumd]);
+                    compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[iumd]);
                 } else {
-                    compute_range(&rho, eph[ieph][sv], ionoutc, grx, xyz[0]);
+                    compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[0]);
                 }
 
                 chan[i].azel[0] = rho.azel[0];
@@ -2015,9 +2025,9 @@ int main(int argc, char *argv[]) {
 
             // Update channel allocation
             if (!staticLocationMode) {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[iumd], elvmask);
+                allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[iumd]);
             } else {
-                allocateChannel(chan, eph[ieph], ionoutc, grx, xyz[0], elvmask);
+                allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[0]);
             }
 
             // Show details about simulated channels
