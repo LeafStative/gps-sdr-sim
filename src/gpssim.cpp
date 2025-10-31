@@ -1228,15 +1228,15 @@ void generate_nav_msg(const gpstime_t g, channel_t &chan, const bool init) {
     }
 }
 
-int checkSatVisibility(
-    const ephem_t &eph, const gpstime_t g, const vec3 &xyz, const double elvMask, const std::span<double, 2> azel) {
-    double tmat[3][3];
+int check_sat_visibility(
+    const ephem_t &eph, const gpstime_t &g, const vec3 &xyz, const double elv_mask, const std::span<double, 2> azel) {
 
     if (!eph.valid) { // Invalid
         return -1;
     }
 
     const auto llh = xyz2llh(xyz);
+    double     tmat[3][3];
     ltcmat(llh, tmat);
 
     vec3                  pos, vel;
@@ -1247,7 +1247,7 @@ int checkSatVisibility(
     const auto neu = ecef2neu(los, tmat);
     neu2azel(neu, azel);
 
-    if (azel[1] * R2D > elvMask) { // Visible
+    if (azel[1] * R2D > elv_mask) { // Visible
         return 1;
     }
 
@@ -1261,7 +1261,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, const gpst
     range_t rho;
 
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        if (checkSatVisibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
+        if (check_sat_visibility(eph[sv], grx, xyz, 0.0, azel) == 1) {
             nsat++; // Number of visible satellites
 
             if (allocated_sat[sv] == -1) { // Visible but not allocated
