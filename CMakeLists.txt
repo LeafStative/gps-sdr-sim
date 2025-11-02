@@ -16,10 +16,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL Windows)
   set(PLATFORM_WINDOWS ON)
 endif()
 
+find_package(cxxopts CONFIG REQUIRED)
 find_package(scn CONFIG REQUIRED)
 
 add_executable(gps-sdr-sim
-  $<$<BOOL:${PLATFORM_WINDOWS}>:src/getopt.c>
   src/gpssim.cpp
   src/vec3.cpp
   src/gpstime.cpp
@@ -27,6 +27,7 @@ add_executable(gps-sdr-sim
 include_directories(gps-sdr-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(gps-sdr-sim PRIVATE
   $<$<NOT:$<BOOL:${PLATFORM_WINDOWS}>>:m>
+  cxxopts::cxxopts
   scn::scn
 )
 

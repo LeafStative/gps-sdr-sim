@@ -1,6 +1,5 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -11,28 +10,26 @@
 #include <bit>
 #include <bitset>
 #include <charconv>
+#include <chrono>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <ranges>
 #include <span>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
+#include <cxxopts.hpp>
 #include <scn/scan.h>
 
-#ifdef _WIN32
-#include "getopt.h"
-#else
-#include <unistd.h>
-#endif
-
 #include "gpssim.h"
-#include "vec3.h"
 
 namespace ranges = std::ranges;
 namespace views  = std::views;
+namespace chrono = std::chrono;
 
 namespace {
 
@@ -1332,43 +1329,275 @@ size_t allocate_channel(
     return sat_count;
 }
 
-void usage() {
-    std::cerr << std::format(
-        "Usage: gps-sdr-sim [options]\n"
-        "Options:\n"
-        "  -e <gps_nav>        RINEX navigation file for GPS ephemerides (required)\n"
-        "  -u <user_motion>    User motion file in ECEF x, y, z format (dynamic mode)\n"
-        "  -x <user_motion>    User motion file in lat, lon, height format (dynamic mode)\n"
-        "  -g <nmea_gga>       NMEA GGA stream (dynamic mode)\n"
-        "  -c <location>       ECEF X,Y,Z in meters (static mode) e.g. 3967283.154,1022538.181,4872414.484\n"
-        "  -l <location>       Lat, lon, height (static mode) e.g. 35.681298,139.766247,10.0\n"
-        "  -L <wnslf,dn,dtslf> User leap future event in GPS week number, day number, next leap second e.g. 2347,3,19\n"
-        "  -t <date,time>      Scenario start time YYYY/MM/DD,hh:mm:ss\n"
-        "  -T <date,time>      Overwrite TOC and TOE to scenario start time\n"
-        "  -d <duration>       Duration [sec] (dynamic mode max: {:.0f}, static mode max: {})\n"
-        "  -o <output>         I/Q sampling data file (default: gpssim.bin)\n"
-        "  -s <frequency>      Sampling frequency [Hz] (default: 2600000)\n"
-        "  -b <iq_bits>        I/Q data format [1/8/16] (default: 16)\n"
-        "  -i                  Disable ionospheric delay for spacecraft scenario\n"
-        "  -p [fixed_gain]     Disable path loss and hold power level constant\n"
-        "  -v                  Show details about simulated channels\n",
+template <typename T = std::string>
+requires std::is_same_v<T, std::string> || std::is_arithmetic_v<T>
+auto opt() {
+    return cxxopts::value<T>();
+}
+
+args_t parse_args(const int argc, char *argv[]) {
+    const auto duration_desc = std::format(
+        "Duration [sec] (dynamic mode max: {:.0f}, static mode max: {})",
         static_cast<double>(USER_MOTION_SIZE) / 10.0,
         STATIC_MAX_DURATION);
+
+    // clang-format off
+    cxxopts::Options options{"gps-sdr-sim", "GPS Software Defined Radio Signal Simulator"};
+    options.add_options()
+        ("e", "RINEX navigation file for GPS ephemerides (required)", opt(), "<gps_nav>")
+        ("u", "User motion file in ECEF x, y, z format (dynamic mode)", opt(), "<user_motion>")
+        ("x", "User motion file in lat, lon, height format (dynamic mode)", opt(), "<user_motion>")
+        ("g", "NMEA GGA stream (dynamic mode)", opt(), "<nmea_gga>")
+        ("c", "ECEF X,Y,Z in meters (static mode) e.g. 3967283.154,1022538.181,4872414.484", opt(), "<location>")
+        ("l", "Lat, lon, height (static mode) e.g. 35.681298,139.766247,10.0", opt(), "<location>")
+        ("L", "User leap future event in GPS week number, day number, next leap second e.g. 2347,3,19", opt(), "<wnslf,dn,dtslf>")
+        ("t", "Scenario start time YYYY/MM/DD,hh:mm:ss", opt(), "<date,time>")
+        ("T", "Overwrite TOC and TOE to scenario start time", opt(), "<date,time>")
+        ("d", duration_desc, opt<double>(), "<duration>")
+        ("o", "I/Q sampling data file", opt()->default_value("gpssim.bin"), "<output>")
+        ("s", "Sampling frequency [Hz]", opt<double>()->default_value("2600000"), "<frequency>")
+        ("b", "I/Q data format [1/8/16]", opt<int>()->default_value("16"), "<iq_bits>")
+        ("i", "Disable ionospheric delay for spacecraft scenario")
+        ("p", "Disable path loss and hold power level constant", cxxopts::value<int>()->implicit_value("128"), "[fixed_gain]")
+        ("v", "Show details about simulated channels")
+        ("h", "Print this help message", cxxopts::value<std::string>());
+    // clang-format on
+
+    args_t args;
+    if (argc < 3) {
+        std::cerr << options.help() << '\n';
+        args.valid = false;
+        return args;
+    }
+
+    const auto parse_result = options.parse(argc, argv);
+    const std::unordered_map<std::string, std::function<bool(args_t & args, const cxxopts::KeyValue &option)>> option_handlers{
+        {"e",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.nav_file = option.value();
+             return true;
+         }},
+        {"u",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.um_file  = option.value();
+             args.nmea_gga = false;
+             args.um_llh   = false;
+             return true;
+         }},
+        {"x",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             // Added by romalvarezllorens@gmail.com
+             args.um_file = option.value();
+             args.um_llh  = true;
+             return true;
+         }},
+        {"g",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.um_file  = option.value();
+             args.nmea_gga = true;
+             return true;
+         }},
+        {"c",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             // Static ECEF coordinates input mode
+             args.static_location_mode = true;
+
+             const auto result = scn::scan<double, double, double>(option.value(), "{},{},{}");
+             if (!result) {
+                 std::cerr << "ERROR: Invalid location format.\n";
+                 return false;
+             }
+
+             const auto [x, y, z] = result->values();
+             xyz[0]               = vec3{x, y, z};
+             return true;
+         }},
+        {"l",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             // Static geodetic coordinates input mode
+             // Added by scateu@gmail.com
+             args.static_location_mode = true;
+
+             const auto result = scn::scan<double, double, double>(option.value(), "{},{},{}");
+             if (!result) {
+                 std::cerr << "ERROR: Invalid location format.\n";
+                 return false;
+             }
+
+             const auto [x, y, z] = result->values();
+             args.llh             = vec3{
+                 x / R2D, // convert to RAD
+                 y / R2D, // convert to RAD
+                 z};
+             xyz[0] = llh2xyz(args.llh); // Convert llh to xyz
+             return true;
+         }},
+        {"L",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             // enable custom Leap Event
+             auto &ionoutc  = args.ionoutc;
+             ionoutc.leapen = true;
+
+             const auto result = scn::scan<int, int, int>(option.value(), "{},{},{}");
+             if (!result) {
+                 std::cerr << "ERROR: Invalid leap future event format.\n";
+                 return false;
+             }
+             const auto [wnlsf, dn, dtlsf] = result->values();
+
+             if (dn < 1 || dn > 7) {
+                 std::cerr << "ERROR: Invalid GPS day number\n";
+                 return false;
+             }
+
+             if (wnlsf < 0) {
+                 std::cerr << "ERROR: Invalid GPS week number\n";
+                 return false;
+             }
+
+             if (dtlsf < -128 || dtlsf > 127) {
+                 std::cerr << "ERROR: Invalid delta leap second\n";
+                 return false;
+             }
+
+             ionoutc.wnlsf = wnlsf;
+             ionoutc.dn    = dn;
+             ionoutc.dtlsf = dtlsf;
+
+             return true;
+         }},
+        {"t",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             const auto result = scn::scan<int, int, int, int, int, double>(option.value(), "{}/{}/{},{}:{}:{}");
+             if (!result) {
+                 std::cerr << "ERROR: Invalid date and time format.\n";
+                 return false;
+             }
+             const auto [y, m, d, hh, mm, sec] = result->values();
+
+             if (y <= 1980 || m < 1 || m > 12 || d < 1 || d > 31 || hh < 0 || hh > 23 || mm < 0 || mm > 59 || sec < 0.0 ||
+                 sec >= 60.0) {
+                 std::cerr << "ERROR: Invalid date and time.\n";
+                 return false;
+             }
+
+             args.t0 = datetime_t{.y = y, .m = m, .d = d, .hh = hh, .mm = mm, .sec = std::floor(sec)};
+             args.g0 = date2gps(args.t0);
+
+             return true;
+         }},
+        {"T",
+         [&](args_t &args, const cxxopts::KeyValue &option) {
+             args.time_overwrite = true;
+             if (option.value() == "now") {
+                 const auto                   now     = chrono::utc_clock::now();
+                 const auto                   sys_now = chrono::clock_cast<chrono::system_clock>(now);
+                 const auto                   days    = chrono::floor<chrono::days>(sys_now);
+                 const chrono::year_month_day ymd{days};
+                 const chrono::hh_mm_ss       hms{sys_now - days};
+                 const auto                   seconds = hms.seconds() + hms.subseconds();
+
+                 args.t0 = datetime_t{
+                     .y   = static_cast<int>(ymd.year()),
+                     .m   = static_cast<int>(static_cast<uint32_t>(ymd.month())),
+                     .d   = static_cast<int>(static_cast<uint32_t>(ymd.day())),
+                     .hh  = hms.hours().count(),
+                     .mm  = hms.minutes().count(),
+                     .sec = chrono::duration_cast<chrono::duration<double>>(seconds).count()};
+
+                 args.g0 = date2gps(args.t0);
+
+                 return true;
+             }
+
+             return option_handlers.at("t")(args, option);
+         }},
+        {"d",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.duration = option.as<double>();
+             return true;
+         }},
+        {"o",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.out_file = option.value();
+             return true;
+         }},
+        {"s",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.sampling_frequency = option.as<double>();
+             if (args.sampling_frequency < 1.0e6) {
+                 std::cerr << "ERROR: Invalid sampling frequency.\n";
+                 return false;
+             }
+
+             return true;
+         }},
+        {"b",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.data_format = option.as<int>();
+             if (args.data_format != SC01 && args.data_format != SC08 && args.data_format != SC16) {
+                 std::cerr << "ERROR: Invalid I/Q data format.\n";
+                 return false;
+             }
+
+             return true;
+         }},
+        {"i",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.ionoutc.enable = false; // Disable ionospheric correction
+             return true;
+         }},
+        {"p",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.fixed_gain = option.as<int>();
+             if (args.fixed_gain < 1 || args.fixed_gain > 128) {
+                 std::cerr << "ERROR: Fixed gain must be between 1 and 128.\n";
+                 return false;
+             }
+             args.path_loss_enable = false; // Disable path loss
+
+             return true;
+         }},
+        {"v",
+         [](args_t &args, const cxxopts::KeyValue &option) {
+             args.verbose = true;
+             return true;
+         }},
+        // No need to handle 'h' flags, it's handled separately
+    };
+
+    if (parse_result.count("h")) {
+        std::cerr << options.help() << '\n';
+        args.valid = false;
+        return args;
+    }
+
+    args.valid = true;
+    for (const auto &option : parse_result) {
+        const auto &key = option.key();
+        if (!option_handlers.contains(key)) {
+            std::cerr << std::format("ERROR: Unknown option '{}'\n", key);
+        }
+
+        if (!option_handlers.at(key)(args, option)) {
+            args.valid = false;
+            return args;
+        }
+    }
+
+    return args;
 }
 
 } // namespace
 
 int main(int argc, char *argv[]) {
-    ephem_t   eph[EPHEM_ARRAY_SIZE][MAX_SAT];
-    gpstime_t g0;
-
-    vec3 llh;
+    ephem_t eph[EPHEM_ARRAY_SIZE][MAX_SAT];
+    vec3    llh;
 
     channel_t chan[MAX_CHAN];
-    double    elvmask = 0.0; // in degree
 
     int          ip, qp;
-    int          iTable;
+    int          i_table;
     short       *iq_buff  = nullptr;
     signed char *iq8_buff = nullptr;
 
@@ -1376,231 +1605,73 @@ int main(int argc, char *argv[]) {
     double    delt;
     int       isamp;
 
-    int  iumd;
-    int  numd;
-    char umfile[MAX_CHAR];
+    int iumd;
+    int numd;
 
-    int staticLocationMode = FALSE;
-    int nmeaGGA            = FALSE;
-    int umLLH              = FALSE;
-
-    char navfile[MAX_CHAR];
-    char outfile[MAX_CHAR];
-
-    double samp_freq;
-    int    iq_buff_size;
-    int    data_format;
-
-    int result;
+    int iq_buff_size;
 
     int    gain[MAX_CHAN];
     double path_loss;
     double ant_gain;
-    int    fixed_gain = 128;
     double ant_pat[37];
     int    ibs; // boresight angle index
 
-    datetime_t t0, tmin, tmax;
+    datetime_t tmin, tmax;
     gpstime_t  gmin, gmax;
     double     dt;
     int        igrx;
-
-    double duration;
-    int    iduration;
-    int    verb;
-
-    int timeoverwrite = FALSE; // Overwrite the TOC and TOE in the RINEX file
-
-    ionoutc_t ionoutc;
-    int       path_loss_enable = TRUE;
 
     ////////////////////////////////////////////////////////////
     // Read options
     ////////////////////////////////////////////////////////////
 
     // Default options
-    navfile[0] = 0;
-    umfile[0]  = 0;
-    strcpy(outfile, "gpssim.bin");
-    samp_freq      = 2.6e6;
-    data_format    = SC16;
-    g0.week        = -1; // Invalid start time
-    iduration      = USER_MOTION_SIZE;
-    duration       = static_cast<double>(iduration) / 10.0; // Default duration
-    verb           = FALSE;
-    ionoutc.enable = true;
-    ionoutc.leapen = false;
+    int iduration = USER_MOTION_SIZE;
 
-    if (argc < 3) {
-        usage();
+    auto args = parse_args(argc, argv);
+    if (!args.valid) {
         return 1;
     }
 
-    while ((result = getopt(argc, argv, "e:u:x:g:c:l:o:s:b:L:T:t:d:ipv")) != -1) {
-        switch (result) {
-        case 'e':
-            strcpy(navfile, optarg);
-            break;
-        case 'u':
-            strcpy(umfile, optarg);
-            nmeaGGA = FALSE;
-            umLLH   = FALSE;
-            break;
-        case 'x':
-            // Added by romalvarezllorens@gmail.com
-            strcpy(umfile, optarg);
-            umLLH = TRUE;
-            break;
-        case 'g':
-            strcpy(umfile, optarg);
-            nmeaGGA = TRUE;
-            break;
-        case 'c':
-            // Static ECEF coordinates input mode
-            staticLocationMode = TRUE;
-            sscanf(optarg, "%lf,%lf,%lf", &xyz[0].x, &xyz[0].y, &xyz[0].z);
-            break;
-        case 'l':
-            // Static geodetic coordinates input mode
-            // Added by scateu@gmail.com
-            staticLocationMode = TRUE;
-            sscanf(optarg, "%lf,%lf,%lf", &llh.x, &llh.y, &llh.z);
-            llh.x /= R2D;          // convert to RAD
-            llh.y /= R2D;          // convert to RAD
-            xyz[0] = llh2xyz(llh); // Convert llh to xyz
-            break;
-        case 'o':
-            strcpy(outfile, optarg);
-            break;
-        case 's':
-            samp_freq = atof(optarg);
-            if (samp_freq < 1.0e6) {
-                std::cerr << "ERROR: Invalid sampling frequency.\n";
-                return 1;
-            }
-            break;
-        case 'b':
-            data_format = atoi(optarg);
-            if (data_format != SC01 && data_format != SC08 && data_format != SC16) {
-                std::cerr << "ERROR: Invalid I/Q data format.\n";
-                return 1;
-            }
-            break;
-        case 'L':
-            // enable custom Leap Event
-            ionoutc.leapen = true;
-            sscanf(optarg, "%d,%d,%d", &ionoutc.wnlsf, &ionoutc.dn, &ionoutc.dtlsf);
-            if (ionoutc.dn < 1 || ionoutc.dn > 7) {
-                std::cerr << "ERROR: Invalid GPS day number\n";
-                return 1;
-            }
-            if (ionoutc.wnlsf < 0) {
-                std::cerr << "ERROR: Invalid GPS week number\n";
-                return 1;
-            }
-            if (ionoutc.dtlsf < -128 || ionoutc.dtlsf > 127) {
-                std::cerr << "ERROR: Invalid delta leap second\n";
-                return 1;
-            }
-            break;
-        case 'T':
-            timeoverwrite = TRUE;
-            if (strncmp(optarg, "now", 3) == 0) {
-                time_t timer;
-                tm    *gmt;
-
-                time(&timer);
-                gmt = gmtime(&timer);
-
-                t0.y   = gmt->tm_year + 1900;
-                t0.m   = gmt->tm_mon + 1;
-                t0.d   = gmt->tm_mday;
-                t0.hh  = gmt->tm_hour;
-                t0.mm  = gmt->tm_min;
-                t0.sec = static_cast<double>(gmt->tm_sec);
-
-                g0 = date2gps(t0);
-
-                break;
-            }
-        case 't':
-            sscanf(optarg, "%d/%d/%d,%d:%d:%lf", &t0.y, &t0.m, &t0.d, &t0.hh, &t0.mm, &t0.sec);
-            if (t0.y <= 1980 || t0.m < 1 || t0.m > 12 || t0.d < 1 || t0.d > 31 || t0.hh < 0 || t0.hh > 23 || t0.mm < 0 ||
-                t0.mm > 59 || t0.sec < 0.0 || t0.sec >= 60.0) {
-                std::cerr << "ERROR: Invalid date and time.\n";
-                return 1;
-            }
-            t0.sec = floor(t0.sec);
-            g0     = date2gps(t0);
-            break;
-        case 'd':
-            duration = atof(optarg);
-            break;
-        case 'i':
-            ionoutc.enable = false; // Disable ionospheric correction
-            break;
-        case 'p':
-            if (optind < argc && argv[optind][0] != '-') { // Check if next item is an argument
-                fixed_gain = atoi(argv[optind]);
-                if (fixed_gain < 1 || fixed_gain > 128) {
-                    std::cerr << "ERROR: Fixed gain must be between 1 and 128.\n";
-                    return 1;
-                }
-                optind++; // Move past this argument for next iteration
-            }
-            path_loss_enable = FALSE; // Disable path loss
-            break;
-        case 'v':
-            verb = TRUE;
-            break;
-        case ':':
-        case '?':
-            usage();
-            return 1;
-        default:
-            break;
-        }
-    }
-
-    if (navfile[0] == 0) {
+    if (args.nav_file.empty()) {
         std::cerr << "ERROR: GPS ephemeris file is not specified.\n";
         return 1;
     }
 
-    if (umfile[0] == 0 && !staticLocationMode) {
+    if (args.um_file.empty() && !args.static_location_mode) {
         // Default static location; Tokyo
-        staticLocationMode = TRUE;
-        llh.x              = 35.681298 / R2D;
-        llh.y              = 139.766247 / R2D;
-        llh.z              = 10.0;
+        args.static_location_mode = true;
+        llh.x                     = 35.681298 / R2D;
+        llh.y                     = 139.766247 / R2D;
+        llh.z                     = 10.0;
     }
 
-    if (duration < 0.0 || (duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !staticLocationMode) ||
-        (duration > STATIC_MAX_DURATION && staticLocationMode)) {
+    if (args.duration < 0.0 || (args.duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !args.static_location_mode) ||
+        (args.duration > STATIC_MAX_DURATION && args.static_location_mode)) {
         std::cerr << "ERROR: Invalid duration.\n";
         return 1;
     }
-    iduration = static_cast<int>(duration * 10.0 + 0.5);
+    iduration = std::lround(args.duration * 10.0);
 
     // Buffer size
-    samp_freq    = floor(samp_freq / 10.0);
-    iq_buff_size = static_cast<int>(samp_freq); // samples per 0.1sec
-    samp_freq *= 10.0;
+    args.sampling_frequency = floor(args.sampling_frequency / 10.0);
+    iq_buff_size            = static_cast<int>(args.sampling_frequency); // samples per 0.1sec
+    args.sampling_frequency *= 10.0;
 
-    delt = 1.0 / samp_freq;
+    delt = 1.0 / args.sampling_frequency;
 
     ////////////////////////////////////////////////////////////
     // Receiver position
     ////////////////////////////////////////////////////////////
 
-    if (!staticLocationMode) {
+    if (!args.static_location_mode) {
         // Read user motion file
-        if (nmeaGGA == TRUE) {
-            numd = read_nmea_gga(xyz, umfile);
-        } else if (umLLH == TRUE) {
-            numd = read_user_motion_llh(xyz, umfile);
+        if (args.nmea_gga) {
+            numd = read_nmea_gga(xyz, args.um_file);
+        } else if (args.um_llh) {
+            numd = read_user_motion_llh(xyz, args.um_file);
         } else {
-            numd = read_user_motion(xyz, umfile);
+            numd = read_user_motion(xyz, args.um_file);
         }
 
         if (numd == -1) {
@@ -1638,7 +1709,8 @@ int main(int argc, char *argv[]) {
     // Read ephemeris
     ////////////////////////////////////////////////////////////
 
-    int neph = read_rinex_nav_all(eph, ionoutc, navfile);
+    auto &ionoutc = args.ionoutc;
+    int   neph    = read_rinex_nav_all(eph, ionoutc, args.nav_file);
 
     if (neph == 0) {
         std::cerr << "ERROR: No ephemeris available.\n";
@@ -1650,7 +1722,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (verb == TRUE && ionoutc.valid) {
+    if (args.verbose && ionoutc.valid) {
         std::cerr << std::format(
             "  {:12.3e} {:12.3e} {:12.3e} {:12.3e}\n", ionoutc.alpha0, ionoutc.alpha1, ionoutc.alpha2, ionoutc.alpha3);
         std::cerr << std::format(
@@ -1683,8 +1755,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    auto &g0 = args.g0;
+    auto &t0 = args.t0;
     if (g0.week >= 0) { // Scenario start time has been set.
-        if (timeoverwrite == TRUE) {
+        if (args.time_overwrite) {
             gpstime_t gtmp;
 
             gtmp.week = g0.week;
@@ -1792,13 +1866,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (data_format == SC08) {
+    if (args.data_format == SC08) {
         iq8_buff = static_cast<signed char *>(calloc(2 * iq_buff_size, 1));
         if (iq8_buff == nullptr) {
             std::cerr << "ERROR: Failed to allocate 8-bit I/Q buffer.\n";
             return 1;
         }
-    } else if (data_format == SC01) {
+    } else if (args.data_format == SC01) {
         iq8_buff = static_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
         if (iq8_buff == nullptr) {
             std::cerr << "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n";
@@ -1809,8 +1883,8 @@ int main(int argc, char *argv[]) {
     // Open output file
     // "-" can be used as name for stdout
     FILE *fp;
-    if (strcmp("-", outfile)) {
-        if (nullptr == (fp = fopen(outfile, "wb"))) {
+    if (args.out_file != "-") {
+        if (nullptr == (fp = fopen(args.out_file.c_str(), "wb"))) {
             std::cerr << "ERROR: Failed to open output file.\n";
             return 1;
         }
@@ -1874,7 +1948,7 @@ int main(int argc, char *argv[]) {
                 size_t  sv = chan[i].prn - 1;
 
                 // Current pseudorange
-                if (!staticLocationMode) {
+                if (!args.static_location_mode) {
                     compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[iumd]);
                 } else {
                     compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[0]);
@@ -1896,10 +1970,10 @@ int main(int argc, char *argv[]) {
                 ant_gain = ant_pat[ibs];
 
                 // Signal gain
-                if (path_loss_enable == TRUE)
+                if (args.path_loss_enable)
                     gain[i] = static_cast<int>(path_loss * ant_gain * 128.0); // scaled by 2^7
                 else
-                    gain[i] = fixed_gain; // hold the power level constant
+                    gain[i] = args.fixed_gain; // hold the power level constant
             }
         }
 
@@ -1910,12 +1984,12 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < MAX_CHAN; i++) {
                 if (chan[i].prn > 0) {
 #ifdef FLOAT_CARR_PHASE
-                    iTable = static_cast<int>(floor(chan[i].carr_phase * 512.0));
+                    i_table = static_cast<int>(floor(chan[i].carr_phase * 512.0));
 #else
-                    iTable = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
+                    i_table = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
 #endif
-                    ip = chan[i].dataBit * chan[i].codeCA * COS_TABLE512[iTable] * gain[i];
-                    qp = chan[i].dataBit * chan[i].codeCA * SIN_TABLE512[iTable] * gain[i];
+                    ip = chan[i].dataBit * chan[i].codeCA * COS_TABLE512[i_table] * gain[i];
+                    qp = chan[i].dataBit * chan[i].codeCA * SIN_TABLE512[i_table] * gain[i];
 
                     // Accumulate for all visible satellites
                     i_acc += ip;
@@ -1974,7 +2048,7 @@ int main(int argc, char *argv[]) {
             iq_buff[isamp * 2 + 1] = static_cast<short>(q_acc);
         }
 
-        if (data_format == SC01) {
+        if (args.data_format == SC01) {
             for (isamp = 0; isamp < 2 * iq_buff_size; isamp++) {
                 if (isamp % 8 == 0) iq8_buff[isamp / 8] = 0x00;
 
@@ -1982,7 +2056,7 @@ int main(int argc, char *argv[]) {
             }
 
             fwrite(iq8_buff, 1, iq_buff_size / 4, fp);
-        } else if (data_format == SC08) {
+        } else if (args.data_format == SC08) {
             for (isamp = 0; isamp < 2 * iq_buff_size; isamp++) {
                 iq8_buff[isamp] = iq_buff[isamp] >> 4; // 12-bit bladeRF -> 8-bit HackRF
                                                        // iq8_buff[isamp] = iq_buff[isamp] >> 8; // for PocketSDR
@@ -2024,14 +2098,14 @@ int main(int argc, char *argv[]) {
             }
 
             // Update channel allocation
-            if (!staticLocationMode) {
+            if (!args.static_location_mode) {
                 allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[iumd]);
             } else {
                 allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[0]);
             }
 
             // Show details about simulated channels
-            if (verb == TRUE) {
+            if (args.verbose) {
                 std::cerr << '\n';
                 for (int i = 0; i < MAX_CHAN; i++) {
                     if (chan[i].prn > 0)

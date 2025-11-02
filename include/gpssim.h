@@ -4,13 +4,12 @@
 #define GPSSIM_H
 
 #include <numbers>
+#include <string>
 
 #include "gpstime.h"
+#include "vec3.h"
 
 // #define FLOAT_CARR_PHASE // For RKT simulation. Higher computational load, but smoother carrier phase.
-
-#define TRUE (1)
-#define FALSE (0)
 
 /*! \brief Maximum length of a line in a text file (RINEX, motion) */
 constexpr auto MAX_CHAR = 100;
@@ -127,9 +126,9 @@ struct ephem_t {
 };
 
 struct ionoutc_t {
-    bool   enable;
     bool   valid;
-    bool   leapen; // enable custom leap event
+    bool   enable = true;
+    bool   leapen = false; // enable custom leap event
     int    dtls;
     int    tot;
     int    wnt;
@@ -146,6 +145,8 @@ struct ionoutc_t {
     double beta3;
     double a0;
     double a1;
+
+    ionoutc_t() = default;
 };
 
 struct range_t {
@@ -180,6 +181,29 @@ struct channel_t {
     int           codeCA;              /*!< current C/A code */
     double        azel[2];
     range_t       rho0;
+};
+
+struct args_t {
+    bool        valid;
+    bool        verbose              = false;
+    bool        static_location_mode = false;
+    bool        nmea_gga             = false;
+    bool        um_llh               = false;
+    bool        time_overwrite       = false; // Overwrite the TOC and TOE in the RINEX file
+    bool        path_loss_enable     = true;
+    int         data_format          = SC16;
+    int         fixed_gain           = 128;
+    double      sampling_frequency   = 2.6e6;
+    double      duration             = USER_MOTION_SIZE / 10.0; // Default duration
+    std::string out_file             = "gpssim.bin";
+    std::string nav_file;
+    std::string um_file;
+    vec3        llh;
+    ionoutc_t   ionoutc;
+    datetime_t  t0;
+    gpstime_t   g0{.week = -1, .sec = 0}; // Invalid start time
+
+    args_t() = default;
 };
 
 #endif
