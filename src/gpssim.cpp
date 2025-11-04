@@ -1,10 +1,3 @@
-#define _CRT_SECURE_NO_DEPRECATE
-
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -1592,41 +1585,10 @@ args_t parse_args(const int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
     ephem_t eph[EPHEM_ARRAY_SIZE][MAX_SAT];
-    vec3    llh;
-
-    channel_t chan[MAX_CHAN];
-
-    int          ip, qp;
-    int          i_table;
-    short       *iq_buff  = nullptr;
-    signed char *iq8_buff = nullptr;
-
-    gpstime_t grx;
-    double    delt;
-    int       isamp;
-
-    int iumd;
-    int numd;
-
-    int iq_buff_size;
-
-    int    gain[MAX_CHAN];
-    double path_loss;
-    double ant_gain;
-    double ant_pat[37];
-    int    ibs; // boresight angle index
-
-    datetime_t tmin, tmax;
-    gpstime_t  gmin, gmax;
-    double     dt;
-    int        igrx;
 
     ////////////////////////////////////////////////////////////
     // Read options
     ////////////////////////////////////////////////////////////
-
-    // Default options
-    int iduration = USER_MOTION_SIZE;
 
     auto args = parse_args(argc, argv);
     if (!args.valid) {
@@ -1638,12 +1600,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    vec3 llh;
     if (args.um_file.empty() && !args.static_location_mode) {
         // Default static location; Tokyo
         args.static_location_mode = true;
-        llh.x                     = 35.681298 / R2D;
-        llh.y                     = 139.766247 / R2D;
-        llh.z                     = 10.0;
+        llh                       = vec3{
+            35.681298 / R2D, //
+            139.766247 / R2D,
+            10.0};
     }
 
     if (args.duration < 0.0 || (args.duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !args.static_location_mode) ||
@@ -1651,42 +1615,39 @@ int main(int argc, char *argv[]) {
         std::cerr << "ERROR: Invalid duration.\n";
         return 1;
     }
-    iduration = std::lround(args.duration * 10.0);
 
     // Buffer size
-    args.sampling_frequency = floor(args.sampling_frequency / 10.0);
-    iq_buff_size            = static_cast<int>(args.sampling_frequency); // samples per 0.1sec
+    args.sampling_frequency = std::floor(args.sampling_frequency / 10.0);
+    const auto iq_buff_size = static_cast<int>(args.sampling_frequency); // samples per 0.1sec
     args.sampling_frequency *= 10.0;
-
-    delt = 1.0 / args.sampling_frequency;
 
     ////////////////////////////////////////////////////////////
     // Receiver position
     ////////////////////////////////////////////////////////////
 
+    int n_umd;
     if (!args.static_location_mode) {
         // Read user motion file
         if (args.nmea_gga) {
-            numd = read_nmea_gga(xyz, args.um_file);
+            n_umd = read_nmea_gga(xyz, args.um_file);
         } else if (args.um_llh) {
-            numd = read_user_motion_llh(xyz, args.um_file);
+            n_umd = read_user_motion_llh(xyz, args.um_file);
         } else {
-            numd = read_user_motion(xyz, args.um_file);
+            n_umd = read_user_motion(xyz, args.um_file);
         }
 
-        if (numd == -1) {
+        if (n_umd == -1) {
             std::cerr << "ERROR: Failed to open user motion / NMEA GGA file.\n";
             return 1;
         }
-        if (numd == 0) {
+        if (n_umd == 0) {
             std::cerr << "ERROR: Failed to read user motion / NMEA GGA data.\n";
             return 1;
         }
 
         // Set simulation duration
-        if (numd > iduration) {
-            numd = iduration;
-        }
+        const int i_duration = std::lround(args.duration * 10.0);
+        n_umd                = std::min(n_umd, i_duration);
 
         // Set user initial position
         llh = xyz2llh(xyz[0]);
@@ -1696,7 +1657,8 @@ int main(int argc, char *argv[]) {
         std::cerr << "Using static location mode.\n";
 
         // Set simulation duration
-        numd = iduration;
+        const auto i_duration = std::lround(args.duration * 10.0);
+        n_umd                 = i_duration;
 
         // Set user initial position
         xyz[0] = llh2xyz(llh);
@@ -1710,14 +1672,14 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     auto &ionoutc = args.ionoutc;
-    int   neph    = read_rinex_nav_all(eph, ionoutc, args.nav_file);
+    int   n_eph   = read_rinex_nav_all(eph, ionoutc, args.nav_file);
 
-    if (neph == 0) {
+    if (n_eph == 0) {
         std::cerr << "ERROR: No ephemeris available.\n";
         return 1;
     }
 
-    if (neph == -1) {
+    if (n_eph == -1) {
         std::cerr << "ERROR: ephemeris file not found.\n";
         return 1;
     }
@@ -1731,26 +1693,22 @@ int main(int argc, char *argv[]) {
         std::cerr << std::format("{:6d}\n", ionoutc.dtls);
     }
 
+    datetime_t t_min;
+    gpstime_t  g_min;
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
         if (eph[0][sv].valid) {
-            gmin = eph[0][sv].toc;
-            tmin = eph[0][sv].t;
+            g_min = eph[0][sv].toc;
+            t_min = eph[0][sv].t;
             break;
         }
     }
 
-    gmax.sec  = 0;
-    gmax.week = 0;
-    tmax.sec  = 0;
-    tmax.mm   = 0;
-    tmax.hh   = 0;
-    tmax.d    = 0;
-    tmax.m    = 0;
-    tmax.y    = 0;
+    gpstime_t  g_max{.week = 0, .sec = 0};
+    datetime_t t_max{.y = 0, .m = 0, .d = 0, .hh = 0, .mm = 0, .sec = 0};
     for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        if (eph[neph - 1][sv].valid) {
-            gmax = eph[neph - 1][sv].toc;
-            tmax = eph[neph - 1][sv].t;
+        if (eph[n_eph - 1][sv].valid) {
+            g_max = eph[n_eph - 1][sv].toc;
+            t_max = eph[n_eph - 1][sv].t;
             break;
         }
     }
@@ -1758,64 +1716,60 @@ int main(int argc, char *argv[]) {
     auto &g0 = args.g0;
     auto &t0 = args.t0;
     if (g0.week >= 0) { // Scenario start time has been set.
-        if (args.time_overwrite) {
-            gpstime_t gtmp;
+        if (!args.time_overwrite && (g0 - g_min < 0.0 || g_max - g0 < 0.0)) {
+            std::cerr << "ERROR: Invalid start time.\n";
+            std::cerr << std::format(
+                "t_min = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
+                t_min.y,
+                t_min.m,
+                t_min.d,
+                t_min.hh,
+                t_min.mm,
+                t_min.sec,
+                g_min.week,
+                g_min.sec);
+            std::cerr << std::format(
+                "t_max = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
+                t_max.y,
+                t_max.m,
+                t_max.d,
+                t_max.hh,
+                t_max.mm,
+                t_max.sec,
+                g_max.week,
+                g_max.sec);
+            return 1;
+        }
 
-            gtmp.week = g0.week;
-            gtmp.sec  = static_cast<double>(static_cast<int>(g0.sec) / 7200) * 7200.0;
+        gpstime_t g_tmp{.week = g0.week, .sec = std::floor(g0.sec / 7200.0) * 7200.0};
 
-            const auto d_sec = gtmp - gmin;
+        // Overwrite the UTC reference week number
+        ionoutc.wnt = g_tmp.week;
+        ionoutc.tot = static_cast<int>(g_tmp.sec);
 
-            // Overwrite the UTC reference week number
-            ionoutc.wnt = gtmp.week;
-            ionoutc.tot = static_cast<int>(gtmp.sec);
+        // Iono/UTC parameters may no longer valid
+        // ionoutc.valid = FALSE;
 
-            // Iono/UTC parameters may no longer valid
-            // ionoutc.valid = FALSE;
-
-            // Overwrite the TOC and TOE to the scenario start time
-            for (size_t sv = 0; sv < MAX_SAT; sv++) {
-                for (int i = 0; i < neph; i++) {
-                    if (eph[i][sv].valid) {
-                        gtmp             = eph[i][sv].toc + d_sec;
-                        const auto t_tmp = gps2date(gtmp);
-                        eph[i][sv].toc   = gtmp;
-                        eph[i][sv].t     = t_tmp;
-
-                        gtmp           = eph[i][sv].toe + d_sec;
-                        eph[i][sv].toe = gtmp;
-                    }
+        // Overwrite the TOC and TOE to the scenario start time
+        const auto d_sec = g_tmp - g_min;
+        for (size_t sv = 0; sv < MAX_SAT; sv++) {
+            for (int i = 0; i < n_eph; i++) {
+                if (!eph[i][sv].valid) {
+                    continue;
                 }
-            }
-        } else {
-            if (g0 - gmin < 0.0 || gmax - g0 < 0.0) {
-                std::cerr << "ERROR: Invalid start time.\n";
-                std::cerr << std::format(
-                    "tmin = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
-                    tmin.y,
-                    tmin.m,
-                    tmin.d,
-                    tmin.hh,
-                    tmin.mm,
-                    tmin.sec,
-                    gmin.week,
-                    gmin.sec);
-                std::cerr << std::format(
-                    "tmax = {:4d}/{:02d}/{:02d},{:02d}:{:02d}:{:02.0f} ({}:{:.0f})\n",
-                    tmax.y,
-                    tmax.m,
-                    tmax.d,
-                    tmax.hh,
-                    tmax.mm,
-                    tmax.sec,
-                    gmax.week,
-                    gmax.sec);
-                return 1;
+
+                g_tmp            = eph[i][sv].toc + d_sec;
+                const auto t_tmp = gps2date(g_tmp);
+                eph[i][sv].toc   = g_tmp;
+                eph[i][sv].t     = t_tmp;
+
+                g_tmp          = eph[i][sv].toe + d_sec;
+                eph[i][sv].toe = g_tmp;
             }
         }
     } else {
-        g0 = gmin;
-        t0 = tmin;
+        g0 = g_min;
+        t0 = t_min;
     }
 
     std::cerr << std::format(
@@ -1828,28 +1782,29 @@ int main(int argc, char *argv[]) {
         t0.sec,
         g0.week,
         g0.sec);
-    std::cerr << std::format("Duration = {:.1f} [sec]\n", static_cast<double>(numd) / 10.0);
+    std::cerr << std::format("Duration = {:.1f} [sec]\n", static_cast<double>(n_umd) / 10.0);
 
     // Select the current set of ephemerides
-    int ieph = -1;
+    int i_eph = -1;
 
-    for (int i = 0; i < neph; i++) {
+    for (int i = 0; i < n_eph; i++) {
         for (size_t sv = 0; sv < MAX_SAT; sv++) {
-            if (eph[i][sv].valid) {
-                dt = g0 - eph[i][sv].toc;
-                if (dt >= -SECONDS_IN_HOUR && dt < SECONDS_IN_HOUR) {
-                    ieph = i;
-                    break;
-                }
+            if (!eph[i][sv].valid) {
+                continue;
+            }
+
+            if (const auto dt = g0 - eph[i][sv].toc; dt >= -SECONDS_IN_HOUR && dt < SECONDS_IN_HOUR) {
+                i_eph = i;
+                break;
             }
         }
 
-        if (ieph >= 0) { // ieph has been set
+        if (i_eph >= 0) { // i_eph has been set
             break;
         }
     }
 
-    if (ieph == -1) {
+    if (i_eph == -1) {
         std::cerr << "ERROR: No current set of ephemerides has been found.\n";
         return 1;
     }
@@ -1859,75 +1814,86 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     // Allocate I/Q buffer
-    iq_buff = static_cast<short *>(calloc(2 * iq_buff_size, 2));
+    const auto iq_buff = std::make_unique_for_overwrite<int16_t[]>(2ULL * iq_buff_size);
 
-    if (iq_buff == nullptr) {
+    if (!iq_buff) {
         std::cerr << "ERROR: Failed to allocate 16-bit I/Q buffer.\n";
         return 1;
     }
 
-    if (args.data_format == SC08) {
-        iq8_buff = static_cast<signed char *>(calloc(2 * iq_buff_size, 1));
-        if (iq8_buff == nullptr) {
+    std::unique_ptr<int8_t[]> iq8_buff;
+    switch (args.data_format) {
+    case SC08:
+        iq8_buff = std::make_unique<int8_t[]>(2ULL * iq_buff_size);
+        if (!iq8_buff) {
             std::cerr << "ERROR: Failed to allocate 8-bit I/Q buffer.\n";
             return 1;
         }
-    } else if (args.data_format == SC01) {
-        iq8_buff = static_cast<signed char *>(calloc(iq_buff_size / 4, 1)); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
-        if (iq8_buff == nullptr) {
+        break;
+    case SC01:
+        iq8_buff = std::make_unique<int8_t[]>(iq_buff_size / 4); // byte = {I0, Q0, I1, Q1, I2, Q2, I3, Q3}
+        if (!iq8_buff) {
             std::cerr << "ERROR: Failed to allocate compressed 1-bit I/Q buffer.\n";
             return 1;
         }
+        break;
+
+    default:
+        break;
     }
 
     // Open output file
     // "-" can be used as name for stdout
-    FILE *fp;
+    std::unique_ptr<std::ofstream> fs_ptr;
     if (args.out_file != "-") {
-        if (nullptr == (fp = fopen(args.out_file.c_str(), "wb"))) {
+        fs_ptr = std::make_unique<std::ofstream>(args.out_file, std::ios::binary);
+        if (!fs_ptr->is_open()) {
             std::cerr << "ERROR: Failed to open output file.\n";
             return 1;
         }
-    } else {
-        fp = stdout;
     }
+
+    std::ostream &os = fs_ptr ? *fs_ptr : std::cout;
 
     ////////////////////////////////////////////////////////////
     // Initialize channels
     ////////////////////////////////////////////////////////////
 
     // Clear all channels
-    for (int i = 0; i < MAX_CHAN; i++) {
-        chan[i].prn = 0;
+    std::array<channel_t, MAX_CHAN> channels;
+    for (auto &chan : channels) {
+        chan.prn = 0;
     }
 
     // Clear satellite allocation flag
-    for (size_t sv = 0; sv < MAX_SAT; sv++) {
-        allocated_sat[sv] = -1;
-    }
+    ranges::fill(allocated_sat, -1);
 
     // Initial reception time
-    grx = g0 + 0.0;
+    auto grx = g0 + 0.0;
 
     // Allocate visible satellites
-    allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[0]);
+    allocate_channel(channels, eph[i_eph], ionoutc, grx, xyz[0]);
 
-    for (int i = 0; i < MAX_CHAN; i++) {
-        if (chan[i].prn > 0)
-            std::cerr << std::format(
-                "{:02d} {:6.1f} {:5.1f} {:11.1f} {:5.1f}\n",
-                chan[i].prn,
-                chan[i].azel[0] * R2D,
-                chan[i].azel[1] * R2D,
-                chan[i].rho0.d,
-                chan[i].rho0.iono_delay);
+    for (auto &chan : channels) {
+        if (chan.prn <= 0) {
+            continue;
+        }
+
+        std::cerr << std::format(
+            "{:02d} {:6.1f} {:5.1f} {:11.1f} {:5.1f}\n",
+            chan.prn,
+            chan.azel[0] * R2D,
+            chan.azel[1] * R2D,
+            chan.rho0.d,
+            chan.rho0.iono_delay);
     }
 
     ////////////////////////////////////////////////////////////
     // Receiver antenna gain pattern
     ////////////////////////////////////////////////////////////
 
-    for (int i = 0; i < 37; i++) {
+    std::array<double, 37> ant_pat;
+    for (size_t i = 0; i < ant_pat.size(); ++i) {
         ant_pat[i] = pow(10.0, -ANT_PAT_DB[i] / 20.0);
     }
 
@@ -1935,108 +1901,110 @@ int main(int argc, char *argv[]) {
     // Generate baseband signals
     ////////////////////////////////////////////////////////////
 
-    clock_t tstart = clock();
+    const auto t_start = chrono::steady_clock::now();
 
     // Update receiver time
     grx += 0.1;
 
-    for (iumd = 1; iumd < numd; iumd++) {
-        for (int i = 0; i < MAX_CHAN; i++) {
-            if (chan[i].prn > 0) {
-                // Refresh code phase and data bit counters
-                range_t rho;
-                size_t  sv = chan[i].prn - 1;
+    const auto delt = 1.0 / args.sampling_frequency;
 
-                // Current pseudorange
-                if (!args.static_location_mode) {
-                    compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[iumd]);
-                } else {
-                    compute_range(rho, eph[ieph][sv], ionoutc, grx, xyz[0]);
-                }
-
-                chan[i].azel[0] = rho.azel[0];
-                chan[i].azel[1] = rho.azel[1];
-
-                // Update code phase and data bit counters
-                compute_code_phase(chan[i], rho, 0.1);
-#ifndef FLOAT_CARR_PHASE
-                chan[i].carr_phasestep = static_cast<int>(round(512.0 * 65536.0 * chan[i].f_carr * delt));
-#endif
-                // Path loss
-                path_loss = 20200000.0 / rho.d;
-
-                // Receiver antenna gain
-                ibs      = static_cast<int>((90.0 - rho.azel[1] * R2D) / 5.0); // covert elevation to boresight
-                ant_gain = ant_pat[ibs];
-
-                // Signal gain
-                if (args.path_loss_enable)
-                    gain[i] = static_cast<int>(path_loss * ant_gain * 128.0); // scaled by 2^7
-                else
-                    gain[i] = args.fixed_gain; // hold the power level constant
+    std::array<int, MAX_CHAN> gain;
+    for (int i_umd = 1; i_umd < n_umd; i_umd++) {
+        for (size_t i = 0; i < MAX_CHAN; i++) {
+            if (channels[i].prn <= 0) {
+                continue;
             }
+
+            // Refresh code phase and data bit counters
+            range_t rho;
+            size_t  sv = channels[i].prn - 1;
+
+            // Current pseudorange
+            compute_range(rho, eph[i_eph][sv], ionoutc, grx, xyz[args.static_location_mode ? 0 : i_umd]);
+
+            channels[i].azel[0] = rho.azel[0];
+            channels[i].azel[1] = rho.azel[1];
+
+            // Update code phase and data bit counters
+            compute_code_phase(channels[i], rho, 0.1);
+#ifndef FLOAT_CARR_PHASE
+            channels[i].carr_phasestep = static_cast<int>(round(512.0 * 65536.0 * channels[i].f_carr * delt));
+#endif
+            // Path loss
+            const auto path_loss = 20200000.0 / rho.d;
+
+            // Receiver antenna gain
+            const auto ibs      = static_cast<int>((90.0 - rho.azel[1] * R2D) / 5.0); // covert elevation to boresight
+            const auto ant_gain = ant_pat[ibs];
+
+            // Signal gain
+            gain[i] = args.path_loss_enable ? static_cast<int>(path_loss * ant_gain * 128.0) : args.fixed_gain; // scaled by 2^7
         }
 
-        for (isamp = 0; isamp < iq_buff_size; isamp++) {
+        for (int i_samp = 0; i_samp < iq_buff_size; ++i_samp) {
             int i_acc = 0;
             int q_acc = 0;
 
             for (int i = 0; i < MAX_CHAN; i++) {
-                if (chan[i].prn > 0) {
-#ifdef FLOAT_CARR_PHASE
-                    i_table = static_cast<int>(floor(chan[i].carr_phase * 512.0));
-#else
-                    i_table = chan[i].carr_phase >> 16 & 0x1ff; // 9-bit index
-#endif
-                    ip = chan[i].dataBit * chan[i].codeCA * COS_TABLE512[i_table] * gain[i];
-                    qp = chan[i].dataBit * chan[i].codeCA * SIN_TABLE512[i_table] * gain[i];
-
-                    // Accumulate for all visible satellites
-                    i_acc += ip;
-                    q_acc += qp;
-
-                    // Update code phase
-                    chan[i].code_phase += chan[i].f_code * delt;
-
-                    if (chan[i].code_phase >= CA_SEQ_LEN) {
-                        chan[i].code_phase -= CA_SEQ_LEN;
-
-                        chan[i].icode++;
-
-                        if (chan[i].icode >= 20) { // 20 C/A codes = 1 navigation data bit
-                            chan[i].icode = 0;
-                            chan[i].ibit++;
-
-                            if (chan[i].ibit >= 30) { // 30 navigation data bits = 1 word
-                                chan[i].ibit = 0;
-                                chan[i].iword++;
-                                /*
-                                if (chan[i].iword>=N_DWORD)
-                                        std::cerr << "\nWARNING: Subframe word buffer overflow.\n";
-                                */
-                            }
-
-                            // Set new navigation data bit
-                            chan[i].dataBit =
-                                static_cast<int>(chan[i].dwrd[chan[i].iword] >> (29 - chan[i].ibit) & 0x1UL) * 2 - 1;
-                        }
-                    }
-
-                    // Set current code chip
-                    chan[i].codeCA = chan[i].ca[static_cast<int>(chan[i].code_phase)] * 2 - 1;
-
-                    // Update carrier phase
-#ifdef FLOAT_CARR_PHASE
-                    chan[i].carr_phase += chan[i].f_carr * delt;
-
-                    if (chan[i].carr_phase >= 1.0)
-                        chan[i].carr_phase -= 1.0;
-                    else if (chan[i].carr_phase < 0.0)
-                        chan[i].carr_phase += 1.0;
-#else
-                    chan[i].carr_phase += chan[i].carr_phasestep;
-#endif
+                if (channels[i].prn <= 0) {
+                    continue;
                 }
+
+#ifdef FLOAT_CARR_PHASE
+                const auto i_table = static_cast<int>(floor(channels[i].carr_phase * 512.0));
+#else
+                const auto i_table = channels[i].carr_phase >> 16 & 0x1ff; // 9-bit index
+#endif
+                const auto ip = channels[i].dataBit * channels[i].codeCA * COS_TABLE512[i_table] * gain[i];
+                const auto qp = channels[i].dataBit * channels[i].codeCA * SIN_TABLE512[i_table] * gain[i];
+
+                // Accumulate for all visible satellites
+                i_acc += ip;
+                q_acc += qp;
+
+                // Update code phase
+                channels[i].code_phase += channels[i].f_code * delt;
+
+                if (channels[i].code_phase >= CA_SEQ_LEN) {
+                    channels[i].code_phase -= CA_SEQ_LEN;
+
+                    channels[i].icode++;
+
+                    if (channels[i].icode >= 20) { // 20 C/A codes = 1 navigation data bit
+                        channels[i].icode = 0;
+                        channels[i].ibit++;
+
+                        if (channels[i].ibit >= 30) { // 30 navigation data bits = 1 word
+                            channels[i].ibit = 0;
+                            channels[i].iword++;
+                            /*
+                            if (channels[i].iword >= N_DWORD) {
+                                std::cerr << "\nWARNING: Subframe word buffer overflow.\n";
+                            }
+                            */
+                        }
+
+                        // Set new navigation data bit
+                        channels[i].dataBit =
+                            static_cast<int>(channels[i].dwrd[channels[i].iword] >> (29 - channels[i].ibit) & 0x1UL) * 2 - 1;
+                    }
+                }
+
+                // Set current code chip
+                channels[i].codeCA = channels[i].ca[static_cast<int>(channels[i].code_phase)] * 2 - 1;
+
+                // Update carrier phase
+#ifdef FLOAT_CARR_PHASE
+                channels[i].carr_phase += channels[i].f_carr * delt;
+
+                if (channels[i].carr_phase >= 1.0) {
+                    channels[i].carr_phase -= 1.0;
+                } else if (channels[i].carr_phase < 0.0) {
+                    channels[i].carr_phase += 1.0;
+                }
+#else
+                channels[i].carr_phase += channels[i].carr_phasestep;
+#endif
             }
 
             // Scaled by 2^7
@@ -2044,52 +2012,61 @@ int main(int argc, char *argv[]) {
             q_acc = (q_acc + 64) >> 7;
 
             // Store I/Q samples into buffer
-            iq_buff[isamp * 2]     = static_cast<short>(i_acc);
-            iq_buff[isamp * 2 + 1] = static_cast<short>(q_acc);
+            iq_buff[i_samp * 2]     = static_cast<int16_t>(i_acc);
+            iq_buff[i_samp * 2 + 1] = static_cast<int16_t>(q_acc);
         }
 
-        if (args.data_format == SC01) {
-            for (isamp = 0; isamp < 2 * iq_buff_size; isamp++) {
-                if (isamp % 8 == 0) iq8_buff[isamp / 8] = 0x00;
+        switch (args.data_format) {
+        case SC01:
 
-                iq8_buff[isamp / 8] |= (iq_buff[isamp] > 0 ? 0x01 : 0x00) << (7 - isamp % 8);
+            for (int i_samp = 0; i_samp < 2 * iq_buff_size; i_samp++) {
+                if (i_samp % 8 == 0) {
+                    iq8_buff[i_samp / 8] = 0x00;
+                }
+
+                iq8_buff[i_samp / 8] |= (iq_buff[i_samp] > 0 ? 0x01 : 0x00) << (7 - i_samp % 8);
             }
 
-            fwrite(iq8_buff, 1, iq_buff_size / 4, fp);
-        } else if (args.data_format == SC08) {
-            for (isamp = 0; isamp < 2 * iq_buff_size; isamp++) {
-                iq8_buff[isamp] = iq_buff[isamp] >> 4; // 12-bit bladeRF -> 8-bit HackRF
-                                                       // iq8_buff[isamp] = iq_buff[isamp] >> 8; // for PocketSDR
+            os.write(reinterpret_cast<char *>(iq8_buff.get()), iq_buff_size / 4);
+            break;
+        case SC08:
+            for (int i_samp = 0; i_samp < 2 * iq_buff_size; i_samp++) {
+                iq8_buff[i_samp] = iq_buff[i_samp] >> 4; // 12-bit bladeRF -> 8-bit HackRF
+                                                         // iq8_buff[i_samp] = iq_buff[i_samp] >> 8; // for PocketSDR
             }
 
-            fwrite(iq8_buff, 1, 2 * iq_buff_size, fp);
-        } else { // data_format==SC16
-            fwrite(iq_buff, 2, 2 * iq_buff_size, fp);
+            os.write(reinterpret_cast<char *>(iq8_buff.get()), 2LL * iq_buff_size);
+            break;
+        case SC16:
+        default:
+            os.write(reinterpret_cast<char *>(iq_buff.get()), 2LL * 2 * iq_buff_size);
+            break;
         }
 
         //
         // Update navigation message and channel allocation every 30 seconds
         //
 
-        igrx = static_cast<int>(grx.sec * 10.0 + 0.5);
-
-        if (igrx % 300 == 0) { // Every 30 seconds
+        if (const auto i_grx = std::lround(grx.sec * 10.0); i_grx % 300 == 0) { // Every 30 seconds
             // Update navigation message
-            for (int i = 0; i < MAX_CHAN; i++) {
-                if (chan[i].prn > 0) generate_nav_msg(grx, chan[i], false);
+            for (auto &channel : channels) {
+                if (channel.prn > 0) {
+                    generate_nav_msg(grx, channel, false);
+                }
             }
 
             // Refresh ephemeris and subframes
             // Quick and dirty fix. Need more elegant way.
             for (size_t sv = 0; sv < MAX_SAT; sv++) {
-                if (eph[ieph + 1][sv].valid) {
-                    dt = eph[ieph + 1][sv].toc - grx;
-                    if (dt < SECONDS_IN_HOUR) {
-                        ieph++;
+                if (eph[i_eph + 1][sv].valid) {
+                    if (const auto dt = eph[i_eph + 1][sv].toc - grx; dt < SECONDS_IN_HOUR) {
+                        i_eph++;
 
-                        for (int i = 0; i < MAX_CHAN; i++) {
+                        for (auto &channel : channels) {
                             // Generate new subframes if allocated
-                            if (chan[i].prn != 0) eph2sbf(eph[ieph][chan[i].prn - 1], ionoutc, chan[i].sbf);
+                            if (channel.prn != 0) {
+                                eph2sbf(eph[i_eph][channel.prn - 1], ionoutc, channel.sbf);
+                            }
                         }
                     }
 
@@ -2098,24 +2075,21 @@ int main(int argc, char *argv[]) {
             }
 
             // Update channel allocation
-            if (!args.static_location_mode) {
-                allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[iumd]);
-            } else {
-                allocate_channel(chan, eph[ieph], ionoutc, grx, xyz[0]);
-            }
+            allocate_channel(channels, eph[i_eph], ionoutc, grx, xyz[args.static_location_mode ? 0 : i_umd]);
 
             // Show details about simulated channels
             if (args.verbose) {
                 std::cerr << '\n';
-                for (int i = 0; i < MAX_CHAN; i++) {
-                    if (chan[i].prn > 0)
+                for (auto &channel : channels) {
+                    if (channel.prn > 0) {
                         std::cerr << std::format(
                             "{:02d} {:6.1f} {:5.1f} {:11.1f} {:5.1f}\n",
-                            chan[i].prn,
-                            chan[i].azel[0] * R2D,
-                            chan[i].azel[1] * R2D,
-                            chan[i].rho0.d,
-                            chan[i].rho0.iono_delay);
+                            channel.prn,
+                            channel.azel[0] * R2D,
+                            channel.azel[1] * R2D,
+                            channel.rho0.d,
+                            channel.rho0.iono_delay);
+                    }
                 }
             }
         }
@@ -2125,21 +2099,17 @@ int main(int argc, char *argv[]) {
 
         // Update time counter
         std::cerr << std::format("\rTime into run = {:4.1f}", grx - g0);
-        fflush(stdout);
+        os.flush();
+        std::cerr.flush();
     }
 
-    clock_t tend = clock();
+    const auto t_end = chrono::steady_clock::now();
 
     std::cerr << "\nDone!\n";
 
-    // Free I/Q buffer
-    free(iq_buff);
-
-    // Close file
-    fclose(fp);
-
     // Process time
-    std::cerr << std::format("Process time = {:.1f} [sec]\n", static_cast<double>(tend - tstart) / CLOCKS_PER_SEC);
+    const auto elapsed = chrono::duration_cast<chrono::duration<double>>(t_end - t_start);
+    std::cerr << std::format("Process time = {:.1f} [sec]\n", elapsed.count());
 
     return 0;
 }
