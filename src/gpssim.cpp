@@ -113,7 +113,7 @@ std::array<vec3, USER_MOTION_SIZE> xyz;
  *  \param[in] prn PRN number of the Satellite Vehicle
  *  \param[out] ca Caller-allocated integer array of 1023 bytes
  */
-void codegen(int *ca, const int prn) {
+void codegen(std::span<int, CA_SEQ_LEN> ca, const int prn) {
     constexpr std::array<size_t, 32> delay{5,   6,   7,   8,   17,  18,  139, 140, 141, 251, 252, 254, 255, 256, 257, 258,
                                            469, 470, 471, 472, 473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862};
 
@@ -648,7 +648,7 @@ auto from_chars(const std::string_view str, T &value) {
 
 /*! \brief Read Ephemeris data from the RINEX Navigation file */
 /*  \param[out] eph Array of Output SV ephemeris data
- *  \param[in] fname File name of the RINEX file
+ *  \param[in] filename File name of the RINEX file
  *  \returns Number of sets of ephemerides in the file
  */
 int read_rinex_nav_all(ephem_t eph[][MAX_SAT], ionoutc_t &ionoutc, const std::string &filename) {
