@@ -198,7 +198,7 @@ struct args_t {
     std::string out_file             = "gpssim.bin";
     std::string nav_file;
     std::string um_file;
-    vec3        llh;
+    vec3        xyz;
     ionoutc_t   ionoutc;
     datetime_t  t0;
     gpstime_t   g0{.week = -1, .sec = 0}; // Invalid start time

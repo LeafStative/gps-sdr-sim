@@ -1407,7 +1407,8 @@ args_t parse_args(const int argc, char *argv[]) {
              }
 
              const auto [x, y, z] = result->values();
-             xyz[0]               = vec3{x, y, z};
+             args.xyz             = vec3{x, y, z};
+
              return true;
          }},
         {"l",
@@ -1423,11 +1424,12 @@ args_t parse_args(const int argc, char *argv[]) {
              }
 
              const auto [x, y, z] = result->values();
-             args.llh             = vec3{
+             const auto llh       = vec3{
                  x / R2D, // convert to RAD
                  y / R2D, // convert to RAD
                  z};
-             xyz[0] = llh2xyz(args.llh); // Convert llh to xyz
+             args.xyz = llh2xyz(llh); // Convert llh to xyz
+
              return true;
          }},
         {"L",
@@ -1605,14 +1607,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    vec3 llh;
     if (args.um_file.empty() && !args.static_location_mode) {
         // Default static location; Tokyo
         args.static_location_mode = true;
-        llh                       = vec3{
+        constexpr auto llh        = vec3{
             35.681298 / R2D, //
             139.766247 / R2D,
             10.0};
+        args.xyz = llh2xyz(llh);
     }
 
     if (args.duration < 0.0 || (args.duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !args.static_location_mode) ||
@@ -1631,7 +1633,18 @@ int main(int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////
 
     int n_umd;
-    if (!args.static_location_mode) {
+    if (args.static_location_mode) {
+        // Static geodetic coordinates input mode: "-l"
+        // Added by scateu@gmail.com
+        std::cerr << "Using static location mode.\n";
+
+        // Set simulation duration
+        const auto i_duration = std::lround(args.duration * 10.0);
+        n_umd                 = i_duration;
+
+        // Set user initial position
+        xyz[0] = args.xyz;
+    } else {
         // Read user motion file
         if (args.nmea_gga) {
             n_umd = read_nmea_gga(xyz, args.um_file);
@@ -1655,21 +1668,11 @@ int main(int argc, char *argv[]) {
         n_umd                = std::min(n_umd, i_duration);
 
         // Set user initial position
-        llh = xyz2llh(xyz[0]);
-    } else {
-        // Static geodetic coordinates input mode: "-l"
-        // Added by scateu@gmail.com
-        std::cerr << "Using static location mode.\n";
-
-        // Set simulation duration
-        const auto i_duration = std::lround(args.duration * 10.0);
-        n_umd                 = i_duration;
-
-        // Set user initial position
-        xyz[0] = llh2xyz(llh);
+        args.xyz = xyz[0];
     }
 
-    std::cerr << std::format("xyz = {:11.1f}, {:11.1f}, {:11.1f}\n", xyz[0].x, xyz[0].y, xyz[0].z);
+    const auto llh = xyz2llh(args.xyz);
+    std::cerr << std::format("xyz = {:11.1f}, {:11.1f}, {:11.1f}\n", args.xyz.x, args.xyz.y, args.xyz.z);
     std::cerr << std::format("llh = {:11.6f}, {:11.6f}, {:11.1f}\n", llh.x * R2D, llh.y * R2D, llh.z);
 
     ////////////////////////////////////////////////////////////
