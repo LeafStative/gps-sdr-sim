@@ -1489,28 +1489,28 @@ args_t parse_args(const int argc, char *argv[]) {
         {"T",
          [&](args_t &args, const cxxopts::KeyValue &option) {
              args.time_overwrite = true;
-             if (option.value() == "now") {
-                 const auto                   now     = chrono::utc_clock::now();
-                 const auto                   sys_now = chrono::clock_cast<chrono::system_clock>(now);
-                 const auto                   days    = chrono::floor<chrono::days>(sys_now);
-                 const chrono::year_month_day ymd{days};
-                 const chrono::hh_mm_ss       hms{sys_now - days};
-                 const auto                   seconds = hms.seconds() + hms.subseconds();
-
-                 args.t0 = datetime_t{
-                     .y   = static_cast<int>(ymd.year()),
-                     .m   = static_cast<int>(static_cast<uint32_t>(ymd.month())),
-                     .d   = static_cast<int>(static_cast<uint32_t>(ymd.day())),
-                     .hh  = hms.hours().count(),
-                     .mm  = hms.minutes().count(),
-                     .sec = chrono::duration_cast<chrono::duration<double>>(seconds).count()};
-
-                 args.g0 = date2gps(args.t0);
-
-                 return true;
+             if (option.value() != "now") {
+                 return option_handlers.at("t")(args, option);
              }
 
-             return option_handlers.at("t")(args, option);
+             const auto                   now     = chrono::utc_clock::now();
+             const auto                   sys_now = chrono::clock_cast<chrono::system_clock>(now);
+             const auto                   days    = chrono::floor<chrono::days>(sys_now);
+             const chrono::year_month_day ymd{days};
+             const chrono::hh_mm_ss       hms{sys_now - days};
+             const auto                   seconds = hms.seconds() + hms.subseconds();
+
+             args.t0 = datetime_t{
+                 .y   = static_cast<int>(ymd.year()),
+                 .m   = static_cast<int>(static_cast<uint32_t>(ymd.month())),
+                 .d   = static_cast<int>(static_cast<uint32_t>(ymd.day())),
+                 .hh  = hms.hours().count(),
+                 .mm  = hms.minutes().count(),
+                 .sec = chrono::duration_cast<chrono::duration<double>>(seconds).count()};
+
+             args.g0 = date2gps(args.t0);
+
+             return true;
          }},
         {"d",
          [](args_t &args, const cxxopts::KeyValue &option) {
