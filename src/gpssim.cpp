@@ -15,6 +15,11 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include <cxxopts.hpp>
 #include <scn/scan.h>
 
@@ -1852,6 +1857,11 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+#ifdef _WIN32
+    else {
+        _setmode(_fileno(stdout), _O_BINARY);
+    }
+#endif
 
     std::ostream &os = fs_ptr ? *fs_ptr : std::cout;
 
@@ -2100,7 +2110,6 @@ int main(int argc, char *argv[]) {
         // Update time counter
         std::cerr << std::format("\rTime into run = {:4.1f}", grx - g0);
         os.flush();
-        std::cerr.flush();
     }
 
     const auto t_end = chrono::steady_clock::now();
