@@ -111,8 +111,7 @@ constexpr auto ANT_PAT_DB = std::to_array({
 });
 // clang-format on
 
-std::array<int, MAX_SAT>           allocated_sat;
-std::array<vec3, USER_MOTION_SIZE> xyz;
+std::array<int, MAX_SAT> allocated_sat;
 
 /* !\brief generate the C/A code sequence for a given Satellite Vehicle PRN
  *  \param[in] prn PRN number of the Satellite Vehicle
@@ -1005,65 +1004,61 @@ void compute_code_phase(channel_t &chan, const range_t &rho, const double dt) {
 }
 
 /*! \brief Read the list of user motions from the input file
- *  \param[out] output Output array of ECEF vectors for user motion
  *  \param[in] filename File name of the text input file
- *  \returns Number of user data motion records read, -1 on error
+ *  \return Output vector of ECEF vectors for user motion, `std::nullopt` on error
  */
-int read_user_motion(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
+std::optional<std::vector<vec3>> read_user_motion(const std::string &filename) {
     std::ifstream fs{filename};
     if (!fs.is_open()) {
-        return -1;
+        return std::nullopt;
     }
 
-    int         num_read;
+    std::vector<vec3> result;
+    result.reserve(DEFAULT_DURATION);
+
     std::string line;
-    for (num_read = 0; num_read < USER_MOTION_SIZE; num_read++) {
-        if (!std::getline(fs, line)) {
-            break;
-        }
-
+    while (std::getline(fs, line)) {
         // Read CSV line
-        const auto result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
-        if (!result) {
+        const auto scan_result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
+        if (!scan_result) {
             break;
         }
-        const auto [t, x, y, z] = result->values();
+        const auto [t, x, y, z] = scan_result->values();
 
-        output[num_read] = vec3{x, y, z};
+        result.emplace_back(x, y, z);
     }
 
-    return num_read;
+    return result;
 }
 
 /*! \brief Read the list of user motions from the input file
- *  \param[out] output Output array of LatLonHei coordinates for user motion
  *  \param[in] filename File name of the text input file with format Lat,Lon,Hei
- *  \returns Number of user data motion records read, -1 on error
+ *  \returns Output vector of LatLonHei coordinates for user motion, `std::nullopt` on error
  *
  * Added by romalvarezllorens@gmail.com
  */
-int read_user_motion_llh(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
+std::optional<std::vector<vec3>> read_user_motion_llh(const std::string &filename) {
     std::ifstream fs{filename};
     if (!fs.is_open()) {
-        return -1;
+        return std::nullopt;
     }
 
-    for (int numd = 0; numd < USER_MOTION_SIZE; ++numd) {
-        std::string line;
-        if (!std::getline(fs, line)) {
-            return numd;
-        }
+    std::vector<vec3> result;
+    result.reserve(DEFAULT_DURATION);
 
+    std::string line;
+    while (std::getline(fs, line)) {
         // Read CSV line
-        const auto result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
-        if (!result) {
-            return numd;
+        const auto scan_result = scn::scan<double, double, double, double>(line, "{},{},{},{}");
+        if (!scan_result) {
+            break;
         }
-        const auto [t, lat, lon, hei] = result->values();
+        const auto [t, lat, lon, hei] = scan_result->values();
 
         if (lat > 90.0 || lat < -90.0 || lon > 180.0 || lon < -180.0) {
             std::cerr << "ERROR: Invalid file format (time[s], latitude[deg], longitude[deg], height [m].\n";
-            return 0; // Empty user motion
+            result.clear();
+            break; // Empty user motion
         }
 
         const auto llh = vec3{
@@ -1071,10 +1066,10 @@ int read_user_motion_llh(const std::span<vec3, USER_MOTION_SIZE> output, const s
             lon / R2D, // convert to RAD
             hei};
 
-        output[numd] = llh2xyz(llh);
+        result.push_back(llh2xyz(llh));
     }
 
-    return USER_MOTION_SIZE;
+    return result;
 }
 
 std::vector<std::string> string_split(const std::string &s, char delimiter) {
@@ -1087,21 +1082,21 @@ std::vector<std::string> string_split(const std::string &s, char delimiter) {
     return result;
 }
 
-int read_nmea_gga(const std::span<vec3, USER_MOTION_SIZE> output, const std::string &filename) {
+std::optional<std::vector<vec3>> read_nmea_gga(const std::string &filename) {
     std::ifstream fs{filename};
     if (!fs.is_open()) {
-        return -1;
+        return std::nullopt;
     }
 
-    std::string line;
-    for (int numd = 0; numd < USER_MOTION_SIZE; ++numd) {
-        if (!std::getline(fs, line)) {
-            return numd;
-        }
+    std::vector<vec3> result;
+    result.reserve(DEFAULT_DURATION);
 
+    std::string line;
+    while (std::getline(fs, line)) {
         const auto elements = string_split(line, ',');
         if (elements.size() != 15) {
-            return 0;
+            result.clear();
+            break;
         }
         auto it = elements.begin();
 
@@ -1148,11 +1143,11 @@ int read_nmea_gga(const std::span<vec3, USER_MOTION_SIZE> output, const std::str
             llh.z += temp;
 
             // Convert geodetic position into ECEF coordinates
-            output[numd] = llh2xyz(llh);
+            result.push_back(llh2xyz(llh));
         }
     }
 
-    return USER_MOTION_SIZE;
+    return result;
 }
 
 void generate_nav_msg(const gpstime_t g, channel_t &chan, const bool init) {
@@ -1334,11 +1329,6 @@ auto opt() {
 }
 
 args_t parse_args(const int argc, char *argv[]) {
-    const auto duration_desc = std::format(
-        "Duration [sec] (dynamic mode max: {:.0f}, static mode max: {})",
-        static_cast<double>(USER_MOTION_SIZE) / 10.0,
-        STATIC_MAX_DURATION);
-
     // clang-format off
     cxxopts::Options options{"gps-sdr-sim", "GPS Software Defined Radio Signal Simulator"};
     options.add_options()
@@ -1351,7 +1341,7 @@ args_t parse_args(const int argc, char *argv[]) {
         ("L", "User leap future event in GPS week number, day number, next leap second e.g. 2347,3,19", opt(), "<wnslf,dn,dtslf>")
         ("t", "Scenario start time YYYY/MM/DD,hh:mm:ss", opt(), "<date,time>")
         ("T", "Overwrite TOC and TOE to scenario start time", opt(), "<date,time>")
-        ("d", duration_desc, opt<double>(), "<duration>")
+        ("d", "Duration [sec]", opt<double>(), "<duration>")
         ("o", "I/Q sampling data file", opt()->default_value("gpssim.bin"), "<output>")
         ("s", "Sampling frequency [Hz]", opt<double>()->default_value("2600000"), "<frequency>")
         ("b", "I/Q data format [1/8/16]", opt<int>()->default_value("16"), "<iq_bits>")
@@ -1361,15 +1351,17 @@ args_t parse_args(const int argc, char *argv[]) {
         ("h", "Print this help message", cxxopts::value<std::string>());
     // clang-format on
 
-    args_t args;
+    args_t args_result;
     if (argc < 3) {
         std::cerr << options.help() << '\n';
-        args.valid = false;
-        return args;
+        args_result.valid = false;
+        return args_result;
     }
 
     const auto parse_result = options.parse(argc, argv);
-    const std::unordered_map<std::string, std::function<bool(args_t & args, const cxxopts::KeyValue &option)>> option_handlers{
+
+    using option_handler_t = std::function<bool(args_t & args, const cxxopts::KeyValue &option)>;
+    const std::unordered_map<std::string, option_handler_t> option_handlers{
         {"e",
          [](args_t &args, const cxxopts::KeyValue &option) {
              args.nav_file = option.value();
@@ -1514,7 +1506,13 @@ args_t parse_args(const int argc, char *argv[]) {
          }},
         {"d",
          [](args_t &args, const cxxopts::KeyValue &option) {
-             args.duration = option.as<double>();
+             const auto duration = option.as<double>();
+             if (duration < 0.0) {
+                 std::cerr << "ERROR: Invalid duration.\n";
+                 return false;
+             }
+
+             args.duration = duration;
              return true;
          }},
         {"o",
@@ -1568,24 +1566,24 @@ args_t parse_args(const int argc, char *argv[]) {
 
     if (parse_result.count("h")) {
         std::cerr << options.help() << '\n';
-        args.valid = false;
-        return args;
+        args_result.valid = false;
+        return args_result;
     }
 
-    args.valid = true;
+    args_result.valid = true;
     for (const auto &option : parse_result) {
         const auto &key = option.key();
         if (!option_handlers.contains(key)) {
             std::cerr << std::format("ERROR: Unknown option '{}'\n", key);
         }
 
-        if (!option_handlers.at(key)(args, option)) {
-            args.valid = false;
-            return args;
+        if (!option_handlers.at(key)(args_result, option)) {
+            args_result.valid = false;
+            return args_result;
         }
     }
 
-    return args;
+    return args_result;
 }
 
 } // namespace
@@ -1617,12 +1615,6 @@ int main(int argc, char *argv[]) {
         args.xyz = llh2xyz(llh);
     }
 
-    if (args.duration < 0.0 || (args.duration > static_cast<double>(USER_MOTION_SIZE) / 10.0 && !args.static_location_mode) ||
-        (args.duration > STATIC_MAX_DURATION && args.static_location_mode)) {
-        std::cerr << "ERROR: Invalid duration.\n";
-        return 1;
-    }
-
     // Buffer size
     args.sampling_frequency = std::floor(args.sampling_frequency / 10.0);
     const auto iq_buff_size = static_cast<int>(args.sampling_frequency); // samples per 0.1sec
@@ -1632,40 +1624,42 @@ int main(int argc, char *argv[]) {
     // Receiver position
     ////////////////////////////////////////////////////////////
 
-    int n_umd;
+    std::vector<vec3> xyz;
+
+    size_t duration;
     if (args.static_location_mode) {
         // Static geodetic coordinates input mode: "-l"
         // Added by scateu@gmail.com
         std::cerr << "Using static location mode.\n";
 
         // Set simulation duration
-        const auto i_duration = std::lround(args.duration * 10.0);
-        n_umd                 = i_duration;
-
-        // Set user initial position
-        xyz[0] = args.xyz;
+        duration = std::lround(args.duration.value_or(DEFAULT_DURATION) * 10.0);
     } else {
         // Read user motion file
+        std::optional<std::vector<vec3>> user_motion;
         if (args.nmea_gga) {
-            n_umd = read_nmea_gga(xyz, args.um_file);
+            user_motion = read_nmea_gga(args.um_file);
         } else if (args.um_llh) {
-            n_umd = read_user_motion_llh(xyz, args.um_file);
+            user_motion = read_user_motion_llh(args.um_file);
         } else {
-            n_umd = read_user_motion(xyz, args.um_file);
+            user_motion = read_user_motion(args.um_file);
         }
 
-        if (n_umd == -1) {
+        if (!user_motion.has_value()) {
             std::cerr << "ERROR: Failed to open user motion / NMEA GGA file.\n";
             return 1;
         }
-        if (n_umd == 0) {
+        if (user_motion->empty()) {
             std::cerr << "ERROR: Failed to read user motion / NMEA GGA data.\n";
             return 1;
         }
 
+        xyz = std::move(user_motion.value());
+
         // Set simulation duration
-        const int i_duration = std::lround(args.duration * 10.0);
-        n_umd                = std::min(n_umd, i_duration);
+        duration = args.duration.has_value()
+                       ? std::min(xyz.size(), static_cast<size_t>(std::lround(args.duration.value() * 10.0)))
+                       : xyz.size();
 
         // Set user initial position
         args.xyz = xyz[0];
@@ -1790,7 +1784,7 @@ int main(int argc, char *argv[]) {
         t0.sec,
         g0.week,
         g0.sec);
-    std::cerr << std::format("Duration = {:.1f} [sec]\n", static_cast<double>(n_umd) / 10.0);
+    std::cerr << std::format("Duration = {:.1f} [sec]\n", static_cast<double>(xyz.size()) / 10.0);
 
     // Select the current set of ephemerides
     int i_eph = -1;
@@ -1885,7 +1879,7 @@ int main(int argc, char *argv[]) {
     auto grx = g0 + 0.0;
 
     // Allocate visible satellites
-    allocate_channel(channels, eph[i_eph], ionoutc, grx, xyz[0]);
+    allocate_channel(channels, eph[i_eph], ionoutc, grx, args.static_location_mode ? args.xyz : xyz[0]);
 
     for (auto &chan : channels) {
         if (chan.prn <= 0) {
@@ -1922,8 +1916,8 @@ int main(int argc, char *argv[]) {
     const auto delt = 1.0 / args.sampling_frequency;
 
     std::array<int, MAX_CHAN> gain;
-    for (int i_umd = 1; i_umd < n_umd; i_umd++) {
-        for (size_t i = 0; i < MAX_CHAN; i++) {
+    for (size_t i_umd = 0; i_umd < duration; ++i_umd) {
+        for (size_t i = 0; i < MAX_CHAN; ++i) {
             if (channels[i].prn <= 0) {
                 continue;
             }
@@ -1933,7 +1927,7 @@ int main(int argc, char *argv[]) {
             size_t  sv = channels[i].prn - 1;
 
             // Current pseudorange
-            compute_range(rho, eph[i_eph][sv], ionoutc, grx, xyz[args.static_location_mode ? 0 : i_umd]);
+            compute_range(rho, eph[i_eph][sv], ionoutc, grx, args.static_location_mode ? args.xyz : xyz[i_umd]);
 
             channels[i].azel[0] = rho.azel[0];
             channels[i].azel[1] = rho.azel[1];
@@ -2088,7 +2082,7 @@ int main(int argc, char *argv[]) {
             }
 
             // Update channel allocation
-            allocate_channel(channels, eph[i_eph], ionoutc, grx, xyz[args.static_location_mode ? 0 : i_umd]);
+            allocate_channel(channels, eph[i_eph], ionoutc, grx, args.static_location_mode ? args.xyz : xyz[i_umd]);
 
             // Show details about simulated channels
             if (args.verbose) {

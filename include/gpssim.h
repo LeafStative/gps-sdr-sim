@@ -4,6 +4,7 @@
 #define GPSSIM_H
 
 #include <numbers>
+#include <optional>
 #include <string>
 
 #include "gpstime.h"
@@ -21,12 +22,7 @@ constexpr size_t MAX_SAT = 32;
 constexpr auto MAX_CHAN = 16;
 
 /*! \brief Maximum number of user motion points */
-#ifndef USER_MOTION_SIZE
-#define USER_MOTION_SIZE (3000) // max duration at 10Hz
-#endif
-
-/*! \brief Maximum duration for static mode*/
-constexpr auto STATIC_MAX_DURATION = 86400; // second
+constexpr size_t DEFAULT_DURATION = 3000; // default duration at 10Hz
 
 /*! \brief Number of subframes */
 constexpr size_t N_SBF = 5; // 5 subframes per frame
@@ -184,24 +180,24 @@ struct channel_t {
 };
 
 struct args_t {
-    bool        valid;
-    bool        verbose              = false;
-    bool        static_location_mode = false;
-    bool        nmea_gga             = false;
-    bool        um_llh               = false;
-    bool        time_overwrite       = false; // Overwrite the TOC and TOE in the RINEX file
-    bool        path_loss_enable     = true;
-    int         data_format          = SC16;
-    int         fixed_gain           = 128;
-    double      sampling_frequency   = 2.6e6;
-    double      duration             = USER_MOTION_SIZE / 10.0; // Default duration
-    std::string out_file             = "gpssim.bin";
-    std::string nav_file;
-    std::string um_file;
-    vec3        xyz;
-    ionoutc_t   ionoutc;
-    datetime_t  t0;
-    gpstime_t   g0{.week = -1, .sec = 0}; // Invalid start time
+    bool                  valid;
+    bool                  verbose              = false;
+    bool                  static_location_mode = false;
+    bool                  nmea_gga             = false;
+    bool                  um_llh               = false;
+    bool                  time_overwrite       = false; // Overwrite the TOC and TOE in the RINEX file
+    bool                  path_loss_enable     = true;
+    int                   data_format          = SC16;
+    int                   fixed_gain           = 128;
+    double                sampling_frequency   = 2.6e6;
+    std::optional<double> duration             = std::nullopt;
+    std::string           out_file             = "gpssim.bin";
+    std::string           nav_file;
+    std::string           um_file;
+    vec3                  xyz;
+    ionoutc_t             ionoutc;
+    datetime_t            t0;
+    gpstime_t             g0{.week = -1, .sec = 0}; // Invalid start time
 
     args_t() = default;
 };
