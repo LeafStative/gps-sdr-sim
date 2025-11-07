@@ -1369,22 +1369,21 @@ args_t parse_args(const int argc, char *argv[]) {
          }},
         {"u",
          [](args_t &args, const cxxopts::KeyValue &option) {
-             args.um_file  = option.value();
-             args.nmea_gga = false;
-             args.um_llh   = false;
+             args.um_file   = option.value();
+             args.um_format = motion_format::xyz;
              return true;
          }},
         {"x",
          [](args_t &args, const cxxopts::KeyValue &option) {
              // Added by romalvarezllorens@gmail.com
-             args.um_file = option.value();
-             args.um_llh  = true;
+             args.um_file   = option.value();
+             args.um_format = motion_format::llh;
              return true;
          }},
         {"g",
          [](args_t &args, const cxxopts::KeyValue &option) {
-             args.um_file  = option.value();
-             args.nmea_gga = true;
+             args.um_file   = option.value();
+             args.um_format = motion_format::nmea_gga;
              return true;
          }},
         {"c",
@@ -1637,12 +1636,16 @@ int main(int argc, char *argv[]) {
     } else {
         // Read user motion file
         std::optional<std::vector<vec3>> user_motion;
-        if (args.nmea_gga) {
-            user_motion = read_nmea_gga(args.um_file);
-        } else if (args.um_llh) {
-            user_motion = read_user_motion_llh(args.um_file);
-        } else {
+        switch (args.um_format) {
+        case motion_format::xyz:
             user_motion = read_user_motion(args.um_file);
+            break;
+        case motion_format::llh:
+            user_motion = read_user_motion_llh(args.um_file);
+            break;
+        case motion_format::nmea_gga:
+            user_motion = read_nmea_gga(args.um_file);
+            break;
         }
 
         if (!user_motion.has_value()) {

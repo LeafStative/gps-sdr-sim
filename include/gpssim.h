@@ -179,14 +179,19 @@ struct channel_t {
     range_t       rho0;
 };
 
+enum class motion_format : uint8_t {
+    xyz,
+    llh,
+    nmea_gga
+};
+
 struct args_t {
     bool                  valid;
     bool                  verbose              = false;
     bool                  static_location_mode = false;
-    bool                  nmea_gga             = false;
-    bool                  um_llh               = false;
     bool                  time_overwrite       = false; // Overwrite the TOC and TOE in the RINEX file
     bool                  path_loss_enable     = true;
+    motion_format         um_format            = motion_format::xyz;
     int                   data_format          = SC16;
     int                   fixed_gain           = 128;
     double                sampling_frequency   = 2.6e6;
